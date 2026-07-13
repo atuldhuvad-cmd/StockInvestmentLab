@@ -32,8 +32,62 @@ const ResearchModule = (function () {
     "Decision Record": "flag", "AI-Generated Summary": "flag"
   };
 
+  // ---- Pure logic (Phase 2 Code Mapping — extracted for independent
+  // verification; each function below corresponds to one Financial
+  // Specification entry, RL-01 through RL-10) ----
+
+  function validateEntry(ticker, title) {
+    return Boolean(ticker && ticker.trim() && title && title.trim());
+  }
+
+  function buildEntry(input) {
+    return {
+      ticker: input.ticker.trim().toUpperCase(),
+      docType: input.docType,
+      title: input.title.trim(),
+      content: (input.content || "").trim(),
+      decision: input.docType === "Decision Record" ? input.decision : null
+    };
+  }
+
+  function computeSummary(entries) {
+    const tickers = Array.from(new Set(entries.map(e => e.ticker)));
+    const perTickerCounts = {};
+    tickers.forEach(t => { perTickerCounts[t] = entries.filter(e => e.ticker === t).length; });
+    return { totalEntries: entries.length, companyCount: tickers.length, perTickerCounts };
+  }
+
+  function latestEntryTime(entries, ticker) {
+    const times = entries.filter(e => e.ticker === ticker).map(e => new Date(e.addedAt).getTime());
+    return times.length ? Math.max(...times) : -Infinity;
+  }
+
+  function computeTickerList(entries, opts) {
+    const sortKey = opts && opts.sortKey;
+    let tickers = Array.from(new Set(entries.map(e => e.ticker)));
+    // RL-D01 fix, 2026-07-13: the ticker order now actually depends on
+    // sortKey — "date" sorts by each ticker's most recent entry (newest
+    // first), matching the "Sort: Newest first" label; anything else
+    // (including the default) falls back to alphabetical. Before this fix,
+    // tickers were always `.sort()`-ed (alphabetical) regardless of the
+    // dropdown's value — confirmed by direct execution, see
+    // Research_regression_tests.js RL-D01.
+    tickers = sortKey === "date"
+      ? tickers.sort((a, b) => latestEntryTime(entries, b) - latestEntryTime(entries, a))
+      : tickers.sort();
+    return ListControls.filterAndSort(tickers, {
+      searchText: (opts && opts.searchText) || "",
+      getSearchable: t => t
+    });
+  }
+
+  function computeTimeline(entries, ticker) {
+    return entries.filter(e => e.ticker === ticker)
+      .sort((a, b) => new Date(b.addedAt) - new Date(a.addedAt));
+  }
+
   function render(container) {
-    const state = { searchText: "", selectedTicker: null };
+    const state = { searchText: "", selectedTicker: null, sortKey: "date" };
 
     container.innerHTML = `
       <div class="module-header">
@@ -72,13 +126,14 @@ const ResearchModule = (function () {
     container.querySelector("#rl-add").addEventListener("click", () => {
       const ticker = container.querySelector("#rl-ticker").value.trim().toUpperCase();
       const title = container.querySelector("#rl-title").value.trim();
-      if (!ticker || !title) { App.showStatus("Ticker and title are required", "error"); return; }
+      if (!validateEntry(ticker, title)) { App.showStatus("Ticker and title are required", "error"); return; }
       const docType = typeSelect.value;
-      WealthData.addResearchNote({
+      const entry = buildEntry({
         ticker, docType, title,
         content: container.querySelector("#rl-content").value.trim(),
         decision: docType === "Decision Record" ? container.querySelector("#rl-decision").value : null
       });
+      WealthData.addResearchNote(entry);
       ["rl-ticker","rl-title","rl-content"].forEach(id => container.querySelector("#"+id).value = "");
       App.saveNow(true);
       state.selectedTicker = ticker;
@@ -91,18 +146,15 @@ const ResearchModule = (function () {
 
   function refresh(container, state) {
     const entries = WealthData.getResearchLibrary();
-    const tickers = Array.from(new Set(entries.map(e => e.ticker))).sort();
+    const summary = computeSummary(entries);
 
-    const filteredTickers = ListControls.filterAndSort(tickers, {
-      searchText: state.searchText,
-      getSearchable: t => t
-    });
+    const filteredTickers = computeTickerList(entries, { searchText: state.searchText, sortKey: state.sortKey });
 
-    container.querySelector("#rl-controls-count").textContent = `${entries.length} ${entries.length === 1 ? "entry" : "entries"} across ${tickers.length} ${tickers.length === 1 ? "company" : "companies"}`;
+    container.querySelector("#rl-controls-count").textContent = `${summary.totalEntries} ${summary.totalEntries === 1 ? "entry" : "entries"} across ${summary.companyCount} ${summary.companyCount === 1 ? "company" : "companies"}`;
 
     const tickerListEl = container.querySelector("#rl-ticker-list");
     tickerListEl.innerHTML = filteredTickers.length
-      ? `<div class="ticket-tabs">${filteredTickers.map(t => `<button class="ticker-chip ${t===state.selectedTicker?'active':''}" data-ticker="${t}">${t} (${entries.filter(e=>e.ticker===t).length})</button>`).join("")}</div>`
+      ? `<div class="ticket-tabs">${filteredTickers.map(t => `<button class="ticker-chip ${t===state.selectedTicker?'active':''}" data-ticker="${t}">${t} (${summary.perTickerCounts[t]})</button>`).join("")}</div>`
       : `<div class="module-sub" style="font-style:italic;padding:12px 0;">No research entries yet. Add your first note above — for any ticker, even one you haven't added to Fundamentals, Portfolio, or Watchlist.</div>`;
 
     tickerListEl.querySelectorAll(".ticker-chip").forEach(btn => {
@@ -119,8 +171,7 @@ const ResearchModule = (function () {
       timelineEl.innerHTML = "";
       return;
     }
-    const tickerEntries = entries.filter(e => e.ticker === state.selectedTicker)
-      .sort((a, b) => new Date(b.addedAt) - new Date(a.addedAt));
+    const tickerEntries = computeTimeline(entries, state.selectedTicker);
 
     timelineEl.innerHTML = `
       <div class="section-head" style="margin-top:20px;"><span class="section-title" style="font-size:15px;">${state.selectedTicker} — knowledge base</span></div>
@@ -140,5 +191,5 @@ const ResearchModule = (function () {
     `;
   }
 
-  return { render };
+  return { render, validateEntry, buildEntry, computeSummary, computeTickerList, computeTimeline };
 })();

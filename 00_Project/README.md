@@ -14,13 +14,13 @@ A verified personal wealth-management application (`01_Source\wealth-suite`), bu
 | Fundamentals | Frozen | v1.0 |
 | Delivery Screener | Frozen | v1.0 |
 | Intraday | Frozen | v1.0 |
+| Research | Frozen | v1.0 |
 | Macro | Pending | v0.0 |
-| Research | Pending | v0.0 |
 | Watchlist | Pending | v0.0 |
 | Persistence | Pending | v0.0 |
 | Settings | Pending | v0.0 |
 
-Regression: **59/59 PASS**, confirmed by real execution — see `07_Session Reports\Session_Report_Laptop_Migration.md`.
+Regression: **91/91 PASS**, confirmed by real execution. First 59 (Portfolio/Fundamentals/Delivery Screener/Intraday) per `07_Session Reports\Session_Report_Laptop_Migration.md`; the additional 32 (Research) confirmed in this same working session — see `05_Modules\Research\Research_Verification_Report.md`.
 
 ## Where to look for what
 
@@ -36,4 +36,4 @@ Regression: **59/59 PASS**, confirmed by real execution — see `07_Session Repo
 
 ## Rule for continuing this project
 
-Per the Charter's Golden Rule and the "No Methodology Changes After Module 3" rule: the verification process itself is frozen. From here, only the software changes — apply the same process to Intraday next, then Macro, Research, Watchlist, Persistence, and Settings, in that order.
+Per the Charter's Golden Rule and the "No Methodology Changes After Module 3" rule: the verification process itself is frozen. From here, only the software changes — apply the same process to Macro next, then Watchlist, Persistence, and Settings, in that order.
