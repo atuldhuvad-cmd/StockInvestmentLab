@@ -1,0 +1,15 @@
+# Stock Investment Lab — .gitignore
+# Ignore only environment/OS/editor noise. All project documentation, source,
+# regression tests, and release archives are intentionally tracked.
+
+node_modules/
+*.log
+*.tmp
+*.bak
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+__pycache__/
+*.pyc

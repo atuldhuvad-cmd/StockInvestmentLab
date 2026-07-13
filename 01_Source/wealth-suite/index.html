@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wealth Intelligence Suite</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,500&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+
+<div class="status-bar" id="status-bar"></div>
+
+<div class="masthead">
+  <div class="wordmark">Wealth Intelligence <em>Suite</em></div>
+  <div class="toolbar">
+    <button id="btn-save">Save</button>
+    <button id="btn-export">Export backup</button>
+    <button id="btn-import">Import backup</button>
+    <input type="file" id="import-file-input" accept="application/json" style="display:none">
+  </div>
+</div>
+<div class="masthead-rule"></div>
+
+<div class="app-shell">
+  <div class="nav-tabs" id="nav-tabs"></div>
+  <div id="module-container"></div>
+</div>
+
+<!-- Data layer -->
+<script src="js/data-model.js"></script>
+<script src="js/seed-data.js"></script>
+<script src="js/persistence.js"></script>
+
+<!-- Shared utilities -->
+<script src="js/list-controls.js"></script>
+<script src="js/company-calculations.js"></script>
+
+<!-- Modules -->
+<script src="js/modules/fundamentals.js"></script>
+<script src="js/modules/settings.js"></script>
+<script src="js/modules/watchlist.js"></script>
+<script src="js/modules/portfolio.js"></script>
+<script src="js/modules/delivery-screener.js"></script>
+<script src="js/modules/research.js"></script>
+<script src="js/modules/macro.js"></script>
+<script src="js/modules/intraday.js"></script>
+
+<!-- Shell (must load after modules, before the registration script below) -->
+<script src="js/app.js"></script>
+
+<script>
+  // Module registration — the only place that knows about all six modules.
+  // Adding a module later means one line here, nothing else in this file
+  // changes.
+  App.registerModule("fundamentals", "Fundamentals", FundamentalsModule.render, "ready");
+  App.registerModule("watchlist", "Watchlist", WatchlistModule.render, "ready");
+  App.registerModule("portfolio", "Portfolio", PortfolioModule.render, "ready");
+  App.registerModule("delivery", "Delivery", DeliveryScreenerModule.render, "ready");
+  App.registerModule("research", "Research", ResearchModule.render, "ready");
+  App.registerModule("macro", "Macro", MacroModule.render, "ready");
+  App.registerModule("intraday", "Intraday", IntradayModule.render, "ready");
+  App.registerModule("settings", "Settings", SettingsModule.render, "ready");
+
+  App.init();
+</script>
+
+</body>
+</html>
