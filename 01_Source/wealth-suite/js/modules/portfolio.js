@@ -64,7 +64,6 @@ const PortfolioModule = (function () {
             ${ASSET_CLASSES.map(c => `<option value="${c}">${c}</option>`).join("")}
           </select>
         </div>
-        <div class="field-row"><label for="pf-date">Purchase date</label><input type="date" id="pf-date"></div>
         <button class="btn" id="pf-add">Add holding</button>
       </div>
 
@@ -91,10 +90,9 @@ const PortfolioModule = (function () {
       WealthData.addHolding({
         ticker, quantity, avgCost,
         currentPrice: isNaN(currentPriceInput) ? null : currentPriceInput,
-        assetClass: container.querySelector("#pf-class").value,
-        purchaseDate: container.querySelector("#pf-date").value || null
+        assetClass: container.querySelector("#pf-class").value
       });
-      ["pf-ticker","pf-qty","pf-cost","pf-price","pf-date"].forEach(id => container.querySelector("#"+id).value = "");
+      ["pf-ticker","pf-qty","pf-cost","pf-price"].forEach(id => container.querySelector("#"+id).value = "");
       App.saveNow(true);
       renderList(container);
     });

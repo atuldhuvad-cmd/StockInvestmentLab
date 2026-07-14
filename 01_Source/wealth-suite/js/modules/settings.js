@@ -8,14 +8,12 @@
 
 const SettingsModule = (function () {
 
+  // Trimmed 2026-07-13 (Product Simplification Audit): 7 fields removed
+  // (defaultRiskPct, dcfGrowthRate, dcfDiscountRate, riskFreeRate,
+  // marginOfSafety, sipMonthlyAmount, targetEquityAllocationPct) — confirmed
+  // by project-wide search to be read by zero calculations anywhere in the
+  // app. Only settings actually consumed by a module remain.
   const FIELDS = [
-    { key: "defaultRiskPct", label: "Default risk per trade (%)", type: "number", step: 0.1 },
-    { key: "dcfGrowthRate", label: "DCF growth rate assumption (%)", type: "number", step: 0.5 },
-    { key: "dcfDiscountRate", label: "DCF discount rate (%)", type: "number", step: 0.5 },
-    { key: "riskFreeRate", label: "Risk-free rate (%)", type: "number", step: 0.1 },
-    { key: "marginOfSafety", label: "Margin of safety (%)", type: "number", step: 1 },
-    { key: "sipMonthlyAmount", label: "SIP monthly amount (₹)", type: "number", step: 1000 },
-    { key: "targetEquityAllocationPct", label: "Target equity allocation (%)", type: "number", step: 1 },
     { key: "intradaySatelliteAllocationPct", label: "Intraday satellite allocation ceiling (%)", type: "number", step: 1 },
     { key: "minRiskRewardRatio", label: "Minimum risk-reward ratio for intraday trades", type: "number", step: 0.1 }
   ];

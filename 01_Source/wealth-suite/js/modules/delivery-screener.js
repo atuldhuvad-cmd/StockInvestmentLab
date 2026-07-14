@@ -300,7 +300,7 @@ const DeliveryScreenerModule = (function () {
               Related: <a href="#" onclick="App.switchTo('fundamentals');return false;" style="color:var(--amber-bright);">Fundamentals</a> ·
               <a href="#" onclick="App.switchTo('portfolio');return false;" style="color:var(--amber-bright);">Portfolio</a> ·
               <a href="#" onclick="App.switchTo('watchlist');return false;" style="color:var(--amber-bright);">Watchlist</a> ·
-              <span style="color:var(--paper-faint);">Research Library (not yet available)</span>
+              <a href="#" onclick="App.switchTo('research');return false;" style="color:var(--amber-bright);">Research</a>
             </div>
           </div>
         </div>

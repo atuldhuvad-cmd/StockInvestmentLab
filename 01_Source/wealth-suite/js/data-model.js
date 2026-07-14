@@ -30,9 +30,15 @@ const WealthData = (function () {
       },
 
       // holdings: your actual portfolio (matches holdings table)
+      // Trimmed 2026-07-13 (Product Simplification Audit): purchaseDate,
+      // liquidityTier, and notes removed from this shape — confirmed by
+      // project-wide search to have zero functional dependencies.
+      // purchaseDate was captured on the add-holding form but never
+      // displayed or read anywhere; liquidityTier and notes (for holdings)
+      // were named here but never given a form field or any code path at
+      // all.
       holdings: [
-        // { id, ticker, quantity, avgCost, purchaseDate, assetClass,
-        //   liquidityTier, active, notes }
+        // { id, ticker, quantity, avgCost, assetClass, active }
       ],
 
       // watchlist: stocks under consideration, separate from actual holdings
@@ -63,14 +69,13 @@ const WealthData = (function () {
       },
 
       // settings: global assumptions used across modules (approved refinement)
+      // Trimmed 2026-07-13 (Product Simplification Audit): defaultRiskPct,
+      // dcfGrowthRate, dcfDiscountRate, riskFreeRate, marginOfSafety, and
+      // sipMonthlyAmount were defined here but never read by any calculation
+      // in the app (no DCF or SIP calculator exists) — removed as dead
+      // configuration, not because a feature was cut. Only the two settings
+      // actually consumed by Intraday remain.
       settings: {
-        defaultRiskPct: 1.0,
-        dcfGrowthRate: 10,
-        dcfDiscountRate: 12,
-        riskFreeRate: 7.0,
-        marginOfSafety: 20,
-        sipMonthlyAmount: 100000,
-        targetEquityAllocationPct: 70,
         intradaySatelliteAllocationPct: 15,
         minRiskRewardRatio: 2.0
       },
