@@ -48,7 +48,7 @@ All test cases executed in Node against the actual `computeRow()` and `computeSu
 | Allocation totals | **Verified** | `bySector` and `byAssetClass` sums independently equal `totalValue` in the summary test (1100+900=2000, matching totalValue=2000 exactly) — confirmed numerically, not assumed from the code structure alone. |
 | Cash consistency | **Not applicable** | This module has no cash/liquidity tracking at all — holdings are the only tracked entity. Not a defect; simply out of current scope. |
 | Impossible states | **Potential Defect — PORT-P01** | See below. |
-| Import consistency | **Not yet tested** | Requires a full Import/Export round-trip test, which belongs to the Persistence module per the recommended verification order — flagged here, not tested prematurely. |
+| Import consistency | **Verified for legacy `active` compatibility (2026-07-14)** | Focused regression confirms JSON round-tripping preserves missing, `true`, and `false`; headless Chrome smoke testing exercised the actual Persistence export/import functions and confirmed `active: false` remains excluded afterward. |
 
 ### PORT-P01 — Potential Defect: Negative quantity produces semantically incorrect gain sign
 - **File:** `js/modules/portfolio.js`

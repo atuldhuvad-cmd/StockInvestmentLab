@@ -6,7 +6,7 @@ Standing invariants for this module. Re-run this checklist after any future chan
 
 - [ ] **Every holding has a `ticker`, `quantity`, and `avgCost`.** Enforced at entry (`render()`'s add-handler rejects if any is missing), but **not enforced at the data-model layer** — `WealthData.addHolding()` itself performs no validation. A holding could be added programmatically (e.g., via a future Import feature) without these fields, and `computeRow()` would likely throw rather than fail gracefully. **Status: gap, not yet a defect** — no current code path creates this state, but nothing prevents a future one from doing so.
 - [ ] **`quantity` and `avgCost` are non-negative.** **Not currently enforced anywhere.** See PORT-P01 in the Verification Report.
-- [x] **`active` defaults to inclusive (treated as active) when unset.** Confirmed by reading the filter logic (`h.active !== false`, not `h.active === true`) — a deliberate, correct default for existing/imported data that predates the `active` field being added.
+- [x] **Legacy `active` values remain backward compatible.** New holdings omit the optional field. Both Portfolio and Intraday use `h.active !== false`, so missing and `true` remain included while an imported legacy `active: false` holding remains excluded.
 - [x] **Sum of per-sector values equals total portfolio value.** Verified numerically in the regression suite (TC-Summary-01) — not just assumed from the grouping logic.
 - [x] **Sum of per-asset-class values equals total portfolio value.** Same verification as above.
 

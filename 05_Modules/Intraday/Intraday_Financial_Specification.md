@@ -31,6 +31,7 @@
 
 ## IN-06: Portfolio Value (shared, not duplicated — fixed 2026-07-12)
 - **Formula:** Identical to Portfolio's FIN-P01 (current value per holding) and FIN-P05 (total value) — now genuinely shared, not reimplemented. `IntradayModule.computeAllocation()` calls `PortfolioModule.computeRow()` and `PortfolioModule.computeSummary()` directly.
+- **Legacy compatibility:** Intraday retains Portfolio's `active !== false` filter. New holdings omit the optional legacy `active` field; missing and `true` holdings count toward the capital base, while imported `active: false` holdings remain excluded.
 - **Cross-reference:** See `Intraday_CrossModule_Review.md` for the duplication finding and its resolution. This entry exists to record that Intraday *consumes* Portfolio's value, not to restate the formula.
 
 ## IN-07: Total Capital Base

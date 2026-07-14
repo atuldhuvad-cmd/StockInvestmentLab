@@ -36,7 +36,7 @@
 
 ## FIN-P05: Portfolio Total Value
 - **Formula:** `totalValue = Σ currentValue` across all **active** holdings (`active !== false`)
-- **Business rule:** "Active" filtering is a soft-delete pattern — a holding is only excluded from totals if `active` is explicitly `false`. A holding with `active` undefined is treated as active (default-inclusive).
+- **Business rule:** `active` is an optional legacy compatibility field and is no longer written for new holdings. A holding is excluded from totals only when an older imported record explicitly contains `active: false`; missing and `true` remain included through the unchanged `active !== false` filter.
 
 ## FIN-P06: Portfolio Total Invested
 - **Formula:** `totalInvested = Σ investedValue` across active holdings.

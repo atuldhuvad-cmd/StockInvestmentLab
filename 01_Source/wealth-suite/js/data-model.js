@@ -37,8 +37,11 @@ const WealthData = (function () {
       // displayed or read anywhere; liquidityTier and notes (for holdings)
       // were named here but never given a form field or any code path at
       // all.
+      // active is an optional legacy compatibility field. New holdings do
+      // not write it; Portfolio and Intraday include missing/true values and
+      // continue to exclude active:false records from older imported backups.
       holdings: [
-        // { id, ticker, quantity, avgCost, assetClass, active }
+        // { id, ticker, quantity, avgCost, assetClass, active? }
       ],
 
       // watchlist: stocks under consideration, separate from actual holdings
@@ -122,7 +125,7 @@ const WealthData = (function () {
     },
     addHolding(holding) {
       const id = Date.now() + Math.random();
-      state.holdings.push({ id, active: true, ...holding });
+      state.holdings.push({ id, ...holding });
       return id;
     },
     removeHolding(id) {
