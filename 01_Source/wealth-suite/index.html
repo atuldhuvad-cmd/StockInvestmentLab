@@ -55,11 +55,11 @@
   // Module registration — the only place that knows about all six modules.
   // Adding a module later means one line here, nothing else in this file
   // changes.
-  App.registerModule("fundamentals", "Fundamentals", FundamentalsModule.render, "ready");
-  App.registerModule("watchlist", "Watchlist", WatchlistModule.render, "ready");
   App.registerModule("portfolio", "Portfolio", PortfolioModule.render, "ready");
+  App.registerModule("watchlist", "Watchlist", WatchlistModule.render, "ready");
   App.registerModule("delivery", "Delivery", DeliveryScreenerModule.render, "ready");
   App.registerModule("research", "Research", ResearchModule.render, "ready");
+  App.registerModule("fundamentals", "Fundamentals", FundamentalsModule.render, "ready");
   App.registerModule("macro", "Macro", MacroModule.render, "ready");
   App.registerModule("intraday", "Intraday", IntradayModule.render, "ready");
   App.registerModule("settings", "Settings", SettingsModule.render, "ready");
