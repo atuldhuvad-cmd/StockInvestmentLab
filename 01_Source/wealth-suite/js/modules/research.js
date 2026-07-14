@@ -22,13 +22,18 @@
 const ResearchModule = (function () {
 
   const DOC_TYPES = [
-    "Investment Thesis", "Bull Case", "Bear Case", "Key Risk",
-    "Management Assessment", "Annual Report Note", "Concall Summary",
-    "AI-Generated Summary", "Quarterly Observation", "Decision Record"
+    "Investment Thesis", "Bull Case", "Bear Case", "Management Assessment",
+    "Company Update", "AI-Generated Summary", "Decision Record"
   ];
+  const LEGACY_TYPE_MAP = {
+    "Key Risk": "Bear Case",
+    "Annual Report Note": "Company Update",
+    "Concall Summary": "Company Update",
+    "Quarterly Observation": "Company Update"
+  };
   const DECISION_OPTIONS = ["Buy", "Sell", "Hold", "Watching", "Passed"];
   const TYPE_COLOR = {
-    "Bull Case": "gain", "Bear Case": "loss", "Key Risk": "loss",
+    "Bull Case": "gain", "Bear Case": "loss",
     "Decision Record": "flag", "AI-Generated Summary": "flag"
   };
 
@@ -40,13 +45,39 @@ const ResearchModule = (function () {
     return Boolean(ticker && ticker.trim() && title && title.trim());
   }
 
+  // Presentation-only compatibility: legacy records keep their original
+  // docType in storage and backups. This helper never mutates the record.
+  function getCanonicalResearchType(rawType) {
+    if (typeof rawType !== "string") return null;
+    const type = rawType.trim();
+    if (!type) return null;
+    if (LEGACY_TYPE_MAP[type]) return LEGACY_TYPE_MAP[type];
+    return DOC_TYPES.includes(type) ? type : null;
+  }
+
+  function getResearchTypeDisplayLabel(rawType) {
+    const canonicalType = getCanonicalResearchType(rawType);
+    if (canonicalType) return canonicalType;
+    if (typeof rawType !== "string" || !rawType.trim()) return "Unclassified";
+    return `Legacy: ${rawType.trim()}`;
+  }
+
+  function escapeHtml(value) {
+    return String(value)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
   function buildEntry(input) {
     return {
       ticker: input.ticker.trim().toUpperCase(),
       docType: input.docType,
       title: input.title.trim(),
       content: (input.content || "").trim(),
-      decision: input.docType === "Decision Record" ? input.decision : null
+      decision: getCanonicalResearchType(input.docType) === "Decision Record" ? input.decision : null
     };
   }
 
@@ -120,7 +151,7 @@ const ResearchModule = (function () {
 
     const typeSelect = container.querySelector("#rl-type");
     typeSelect.addEventListener("change", () => {
-      container.querySelector("#rl-decision-field").style.display = typeSelect.value === "Decision Record" ? "flex" : "none";
+      container.querySelector("#rl-decision-field").style.display = getCanonicalResearchType(typeSelect.value) === "Decision Record" ? "flex" : "none";
     });
 
     container.querySelector("#rl-add").addEventListener("click", () => {
@@ -131,7 +162,7 @@ const ResearchModule = (function () {
       const entry = buildEntry({
         ticker, docType, title,
         content: container.querySelector("#rl-content").value.trim(),
-        decision: docType === "Decision Record" ? container.querySelector("#rl-decision").value : null
+        decision: getCanonicalResearchType(docType) === "Decision Record" ? container.querySelector("#rl-decision").value : null
       });
       WealthData.addResearchNote(entry);
       ["rl-ticker","rl-title","rl-content"].forEach(id => container.querySelector("#"+id).value = "");
@@ -176,20 +207,27 @@ const ResearchModule = (function () {
     timelineEl.innerHTML = `
       <div class="section-head" style="margin-top:20px;"><span class="section-title" style="font-size:15px;">${state.selectedTicker} — knowledge base</span></div>
       <div class="card-list" style="display:flex;">
-        ${tickerEntries.map(e => `
+        ${tickerEntries.map(e => {
+          const canonicalType = getCanonicalResearchType(e.docType);
+          const typeLabel = getResearchTypeDisplayLabel(e.docType);
+          return `
           <div class="data-card">
             <div class="data-card-title" style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
               <span>${e.title}</span>
-              <span class="chip ${TYPE_COLOR[e.docType]||''}" style="font-family:var(--mono);font-size:10px;padding:3px 8px;border:1px solid var(--rule-bright);white-space:nowrap;">${e.docType}</span>
+              <span class="chip ${TYPE_COLOR[canonicalType]||''}" style="font-family:var(--mono);font-size:10px;padding:3px 8px;border:1px solid var(--rule-bright);white-space:nowrap;">${escapeHtml(typeLabel)}</span>
             </div>
             ${e.decision ? `<div class="data-card-row"><span class="k">Decision</span><span class="v">${e.decision}</span></div>` : ""}
             ${e.content ? `<div style="font-size:13px;color:var(--paper-dim);margin-top:8px;white-space:pre-wrap;">${e.content}</div>` : ""}
             <div class="module-sub" style="margin-top:10px;font-style:italic;">${new Date(e.addedAt).toLocaleDateString('en-IN', {day:'numeric',month:'short',year:'numeric'})}</div>
           </div>
-        `).join("")}
+        `; }).join("")}
       </div>
     `;
   }
 
-  return { render, validateEntry, buildEntry, computeSummary, computeTickerList, computeTimeline };
+  return {
+    render, validateEntry, buildEntry, computeSummary, computeTickerList, computeTimeline,
+    getCanonicalResearchType, getResearchTypeDisplayLabel,
+    getDocumentTypes: () => [...DOC_TYPES]
+  };
 })();

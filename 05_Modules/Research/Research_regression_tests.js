@@ -25,9 +25,46 @@ function assertDeepEqual(label, actual, expected) {
   return pass;
 }
 
-eval(fs.readFileSync(path.join(__dirname, 'js/data-model.js'), 'utf8') + '\nglobal.WealthData = WealthData;');
-eval(fs.readFileSync(path.join(__dirname, 'js/list-controls.js'), 'utf8') + '\nglobal.ListControls = ListControls;');
-eval(fs.readFileSync(path.join(__dirname, 'js/modules/research.js'), 'utf8') + '\nglobal.ResearchModule = ResearchModule;');
+const suiteRoot = path.resolve(__dirname, '..', '..', '01_Source', 'wealth-suite');
+eval(fs.readFileSync(path.join(suiteRoot, 'js/data-model.js'), 'utf8') + '\nglobal.WealthData = WealthData;');
+eval(fs.readFileSync(path.join(suiteRoot, 'js/list-controls.js'), 'utf8') + '\nglobal.ListControls = ListControls;');
+eval(fs.readFileSync(path.join(suiteRoot, 'js/modules/research.js'), 'utf8') + '\nglobal.ResearchModule = ResearchModule;');
+
+console.log("=== Research document-type compatibility ===");
+assertDeepEqual("Form exposes exactly seven canonical types", ResearchModule.getDocumentTypes(), [
+  "Investment Thesis", "Bull Case", "Bear Case", "Management Assessment",
+  "Company Update", "AI-Generated Summary", "Decision Record"
+]);
+assertExact("Key Risk displays as Bear Case", ResearchModule.getResearchTypeDisplayLabel("Key Risk"), "Bear Case");
+assertExact("Bear Case displays as Bear Case", ResearchModule.getResearchTypeDisplayLabel("Bear Case"), "Bear Case");
+assertExact("Annual Report Note displays as Company Update", ResearchModule.getResearchTypeDisplayLabel("Annual Report Note"), "Company Update");
+assertExact("Concall Summary displays as Company Update", ResearchModule.getResearchTypeDisplayLabel("Concall Summary"), "Company Update");
+assertExact("Quarterly Observation displays as Company Update", ResearchModule.getResearchTypeDisplayLabel("Quarterly Observation"), "Company Update");
+assertExact("Unknown type is identified as legacy", ResearchModule.getResearchTypeDisplayLabel("Broker Note"), "Legacy: Broker Note");
+assertExact("Missing type displays as Unclassified", ResearchModule.getResearchTypeDisplayLabel(undefined), "Unclassified");
+assertExact("Blank type displays as Unclassified", ResearchModule.getResearchTypeDisplayLabel("   "), "Unclassified");
+
+const newBearCase = ResearchModule.buildEntry({ ticker: "TCS", docType: "Bear Case", title: "Downside" });
+const newCompanyUpdate = ResearchModule.buildEntry({ ticker: "TCS", docType: "Company Update", title: "Q1 update" });
+assertExact("New Bear Case stores canonical value", newBearCase.docType, "Bear Case");
+assertExact("New Company Update stores canonical value", newCompanyUpdate.docType, "Company Update");
+
+const legacyFixtures = [
+  { ticker: "TCS", docType: "Key Risk" },
+  { ticker: "INFY", docType: "Annual Report Note" },
+  { ticker: "HDFCBANK", docType: "Concall Summary" },
+  { ticker: "ITC", docType: "Quarterly Observation" }
+];
+const legacyBeforePresentation = JSON.stringify(legacyFixtures);
+legacyFixtures.forEach(entry => ResearchModule.getResearchTypeDisplayLabel(entry.docType));
+assertExact("Presentation leaves legacy raw values unchanged", JSON.stringify(legacyFixtures), legacyBeforePresentation);
+const backupRoundTrip = JSON.parse(JSON.stringify({ researchLibrary: legacyFixtures }));
+assertDeepEqual("JSON backup round-trip preserves legacy raw values", backupRoundTrip.researchLibrary.map(e => e.docType), [
+  "Key Risk", "Annual Report Note", "Concall Summary", "Quarterly Observation"
+]);
+
+const deliverySource = fs.readFileSync(path.join(suiteRoot, 'js/modules/delivery-screener.js'), 'utf8');
+assertExact("Delivery Research link still targets the Research route", deliverySource.includes("App.switchTo('research')"), true);
 
 console.log("=== RL-01: Entry Validation ===");
 assertExact("Valid ticker + title", ResearchModule.validateEntry("TCS", "Q1 notes"), true);

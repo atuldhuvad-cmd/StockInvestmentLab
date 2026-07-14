@@ -26,6 +26,17 @@
 - **Business rules:** The guard is enforced in `buildEntry()` itself, not just by hiding the dropdown in the UI — so even if a caller passed a stray `decision` value alongside a non-Decision-Record `docType`, it would still be discarded. Defense at the data layer, not only at the form layer.
 - **Worked example:** `docType="Bull Case"`, `decision="Buy"` (hypothetically passed) → stored `decision: null`.
 
+### Research document-type presentation compatibility
+
+Research document types use a presentation-only compatibility mapping. Existing records are never rewritten during rendering, IndexedDB loading, or backup import/export.
+
+- Canonical types for new entries: `Investment Thesis`, `Bull Case`, `Bear Case`, `Management Assessment`, `Company Update`, `AI-Generated Summary`, `Decision Record`.
+- Legacy `Key Risk` displays as `Bear Case`.
+- Legacy `Annual Report Note`, `Concall Summary`, and `Quarterly Observation` display as `Company Update`.
+- Unknown non-empty types display as `Legacy: <raw value>` while retaining the raw stored value.
+- Missing or blank types display as `Unclassified`.
+- The canonical type controls badge presentation and the `Decision Record` guard only; it does not mutate persisted data.
+
 ## RL-04: Entry ID & Timestamp Assignment
 - **Business purpose:** Every entry needs a unique identifier (for click/select targeting) and a creation timestamp (for the "newest first" ordering in RL-08/RL-09).
 - **Formula:** `id = Date.now() + Math.random()`; `addedAt = new Date().toISOString()`
