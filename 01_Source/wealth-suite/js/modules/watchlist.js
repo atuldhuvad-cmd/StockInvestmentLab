@@ -11,8 +11,18 @@
 
 const WatchlistModule = (function () {
 
-  const CATEGORIES = ["Watch", "Research", "Buy Soon", "Reject"];
+  const CATEGORIES = [
+    { value: "Watch", label: "Watch" },
+    { value: "Research", label: "Needs Study" },
+    { value: "Buy Soon", label: "Buy Soon" },
+    { value: "Reject", label: "Reject" }
+  ];
   const CATEGORY_COLOR = { "Watch": "", "Research": "flag", "Buy Soon": "gain", "Reject": "loss" };
+
+  function categoryLabel(value) {
+    const category = CATEGORIES.find(item => item.value === value);
+    return category ? category.label : value;
+  }
 
   function render(container) {
     container.innerHTML = `
@@ -25,7 +35,7 @@ const WatchlistModule = (function () {
         <div class="field-row"><label for="wl-ticker">Ticker</label><input type="text" id="wl-ticker" style="text-transform:uppercase" placeholder="e.g. WIPRO"></div>
         <div class="field-row"><label for="wl-category">Category</label>
           <select id="wl-category" style="min-height:44px;background:var(--bg-ticket);border:1px solid var(--rule-bright);color:var(--paper);font-family:var(--mono);padding:0 10px;width:100%;">
-            ${CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join("")}
+            ${CATEGORIES.map(c => `<option value="${c.value}">${c.label}</option>`).join("")}
           </select>
         </div>
         <div class="field-row"><label for="wl-target">Target price (₹, optional)</label><input type="number" id="wl-target" placeholder="e.g. 450"></div>
@@ -72,7 +82,7 @@ const WatchlistModule = (function () {
     container.querySelector("#wl-table-body").innerHTML = items.length ? items.map(item => `
       <tr>
         <td>${item.ticker}</td>
-        <td>${item.category}</td>
+        <td>${categoryLabel(item.category)}</td>
         <td>${item.targetPrice ? '₹' + item.targetPrice.toLocaleString('en-IN') : '—'}</td>
         <td style="text-align:left;max-width:220px;white-space:normal;">${item.notes || '—'}</td>
         <td>${new Date(item.dateAdded).toLocaleDateString('en-IN')}</td>
@@ -87,7 +97,7 @@ const WatchlistModule = (function () {
       <div class="data-card">
         <div class="data-card-title" style="display:flex;justify-content:space-between;align-items:center;">
           ${item.ticker}
-          <span class="chip ${CATEGORY_COLOR[item.category]}" style="font-family:var(--mono);font-size:10px;padding:3px 8px;border:1px solid var(--rule-bright);">${item.category}</span>
+          <span class="chip ${CATEGORY_COLOR[item.category]}" style="font-family:var(--mono);font-size:10px;padding:3px 8px;border:1px solid var(--rule-bright);">${categoryLabel(item.category)}</span>
         </div>
         ${item.targetPrice ? `<div class="data-card-row"><span class="k">Target</span><span class="v">₹${item.targetPrice.toLocaleString('en-IN')}</span></div>` : ""}
         ${item.notes ? `<div class="data-card-row"><span class="k">Notes</span><span class="v" style="text-align:right;max-width:60%;">${item.notes}</span></div>` : ""}
