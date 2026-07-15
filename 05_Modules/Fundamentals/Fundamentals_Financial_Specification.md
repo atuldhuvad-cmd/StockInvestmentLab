@@ -12,6 +12,10 @@
 - **Edge cases:** `totalEquity = 0` → `null` (verified). `totalEquity < 0` → now also `null` (verified, TC-F03, fixed 2026-07-12).
 - **Worked example:** netProfit=₹1,360 Cr, totalEquity=₹5,000 Cr → ROE = 1360/5000×100 = **27.2%**.
 
+### Historical ROE presentation
+
+The desktop year table and mobile year cards share `formatHistoricalRoe(year)`. This presentation helper deliberately preserves the established historical formula and formatting: truthy ending equity permits `netProfit / totalEquity × 100`, rendered to one decimal with `%`; zero or missing equity renders `—%`. It does not call or alter the stricter latest-year ROE calculation, and it is not consumed by Delivery Screener scoring or rankings.
+
 ## FIN-F02: Return on Capital Employed (ROCE)
 - **Formula (fixed 2026-07-12, FUND-D01):** `capEmployed = totalAssets − (currentLiabilities || 0)`; `roce = (capEmployed && capEmployed > 0) ? (ebit / capEmployed) × 100 : null`
 - **Business rules:** Now requires `capEmployed` strictly positive, same fix pattern as ROE.

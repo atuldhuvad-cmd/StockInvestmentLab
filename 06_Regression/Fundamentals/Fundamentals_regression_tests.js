@@ -36,14 +36,17 @@ function assertExact(testId, label, actual, expected) {
 }
 
 // ---- Load the real production code, not reimplementations ----
-eval(fs.readFileSync(path.join(__dirname, 'js/data-model.js'), 'utf8') + '\nglobal.WealthData = WealthData;');
-eval(fs.readFileSync(path.join(__dirname, 'js/company-calculations.js'), 'utf8') + '\nglobal.CompanyCalculations = CompanyCalculations;');
+const suiteRoot = path.resolve(__dirname, '..', '..', '01_Source', 'wealth-suite');
+eval(fs.readFileSync(path.join(suiteRoot, 'js/data-model.js'), 'utf8') + '\nglobal.WealthData = WealthData;');
+eval(fs.readFileSync(path.join(suiteRoot, 'js/company-calculations.js'), 'utf8') + '\nglobal.CompanyCalculations = CompanyCalculations;');
+eval(fs.readFileSync(path.join(suiteRoot, 'js/modules/fundamentals.js'), 'utf8') + '\nglobal.FundamentalsModule = FundamentalsModule;');
 
 // FIN-D01–D04 fix (2026-07-12, Delivery Screener Phase 3) moved latestRatios()
 // out of fundamentals.js and into the shared CompanyCalculations — this test
 // now pulls it from its actual current location instead of string-extracting
 // stale source that no longer contains the function definition.
 const latestRatios = CompanyCalculations.latestRatios;
+const formatHistoricalRoe = FundamentalsModule.formatHistoricalRoe;
 
 function makeYears(overrides) {
   const base = { revenue: 10000, ebit: 1500, netProfit: 1000, totalEquity: 5000, totalDebt: 1000,
@@ -51,6 +54,13 @@ function makeYears(overrides) {
     operatingCashFlow: 900, capex: 300, promoterHolding: 50, pledgePct: 0 };
   return [2023, 2024, 2025, 2026].map((y, i) => ({ ...base, year: y, ...(overrides(i) || {}) }));
 }
+
+console.log("=== TC-F00: Historical ROE presentation compatibility ===");
+assertExact("TC-F00a", "Positive equity keeps one-decimal historical ROE", formatHistoricalRoe({ netProfit: 500, totalEquity: 2000 }), "25.0%");
+assertExact("TC-F00b", "Zero equity keeps the existing placeholder", formatHistoricalRoe({ netProfit: 500, totalEquity: 0 }), "—%");
+assertExact("TC-F00c", "Missing equity keeps the existing placeholder", formatHistoricalRoe({ netProfit: 500 }), "—%");
+assertExact("TC-F00d", "Negative equity keeps the existing historical formula", formatHistoricalRoe({ netProfit: 500, totalEquity: -2000 }), "-25.0%");
+assertExact("TC-F00e", "Missing net profit keeps the existing display behavior", formatHistoricalRoe({ totalEquity: 2000 }), "NaN%");
 
 console.log("=== TC-F01: Normal case ===");
 const r1 = latestRatios({ years: makeYears(i => ({ revenue: 10000 + i * 1000, netProfit: 1000 * (1 + i * 0.12) })) });
@@ -97,7 +107,7 @@ const r9 = latestRatios({ years: makeYears(i => ({ revenue: 1e12 * (1 + i * 0.05
 assertExact("TC-F09", "ROE at trillion-scale revenue is finite and non-NaN", isFinite(r9.roe) && !isNaN(r9.roe), true);
 
 console.log("\n=== TC-F10: Regression baseline — BAJFINANCE red flags against real seeded data ===");
-eval(fs.readFileSync(path.join(__dirname, 'js/seed-data.js'), 'utf8') + '\nglobal.SEED_FUNDAMENTALS = SEED_FUNDAMENTALS;');
+eval(fs.readFileSync(path.join(suiteRoot, 'js/seed-data.js'), 'utf8') + '\nglobal.SEED_FUNDAMENTALS = SEED_FUNDAMENTALS;');
 const bajajFlags = CompanyCalculations.detectRedFlags({ years: SEED_FUNDAMENTALS.BAJFINANCE.years, auditorLog: SEED_FUNDAMENTALS.BAJFINANCE.auditorLog });
 assertExact("TC-F10", "BAJFINANCE red flag count (established baseline from prior session verification)", bajajFlags.length, 4);
 
