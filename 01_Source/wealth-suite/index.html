@@ -39,6 +39,7 @@
 <script src="js/company-calculations.js"></script>
 
 <!-- Modules -->
+<script src="js/modules/overview.js"></script>
 <script src="js/modules/fundamentals.js"></script>
 <script src="js/modules/settings.js"></script>
 <script src="js/modules/watchlist.js"></script>
@@ -52,9 +53,10 @@
 <script src="js/app.js"></script>
 
 <script>
-  // Module registration — the only place that knows about all six modules.
+  // Module registration — the only place that knows about all nine modules.
   // Adding a module later means one line here, nothing else in this file
   // changes.
+  App.registerModule("overview", "Overview", OverviewModule.render, "ready");
   App.registerModule("portfolio", "Portfolio", PortfolioModule.render, "ready");
   App.registerModule("watchlist", "Watchlist", WatchlistModule.render, "ready");
   App.registerModule("delivery", "Delivery", DeliveryScreenerModule.render, "ready");

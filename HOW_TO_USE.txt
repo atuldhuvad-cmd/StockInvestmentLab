@@ -1,0 +1,48 @@
+WEALTH INTELLIGENCE SUITE v1.0 - QUICK GUIDE
+============================================================
+
+OPEN THE APPLICATION
+Double-click Open_Wealth_Intelligence_Suite.bat in this folder.
+The suite opens locally in your default web browser. Keep this project folder
+in place so the launcher can find 01_Source\wealth-suite\index.html.
+
+RECOMMENDED DAILY WORKFLOW
+1. Open Overview for the current factual snapshot.
+2. Update Portfolio prices and holdings when needed.
+3. Review Watchlist and Delivery candidates.
+4. Record supporting work in Research and review Fundamentals.
+5. Import a Macro JSON snapshot when new data is available.
+6. Use Intraday as a discipline log, then check Settings if limits change.
+7. Click Save, then export a backup regularly.
+
+MODULES
+Overview      Read-only daily summary of existing suite data.
+Portfolio     Holdings, value, gain/loss, and allocation.
+Watchlist     Companies to watch, study, buy soon, or reject.
+Delivery      Existing ranked decision-support scores and ratings.
+Research      Company notes, cases, updates, summaries, and decisions.
+Fundamentals  Financial history, ratios, quality context, and red flags.
+Macro         Factual imported Indian macro readings.
+Intraday      Trade-discipline checklist, log, and allocation ceiling.
+Settings      Intraday allocation and minimum risk/reward settings.
+
+STORAGE AND BACKUPS
+The suite stores data in IndexedDB inside the local browser profile used to
+open it. Data is not uploaded by the application. Different browsers or
+browser profiles have separate storage.
+
+To back up: click Export backup and keep the downloaded JSON file somewhere
+safe. Export before clearing browser data, resetting the browser profile,
+moving computers, or reinstalling the browser.
+
+To restore: click Import backup, select a previously exported JSON file, and
+confirm the replacement. Import replaces the suite's current browser data,
+so export the current state first if it may be needed later.
+
+PRIVACY AND USE
+Your portfolio and research remain in the local browser unless you copy or
+share an exported backup. Protect backup files because they may contain
+private financial information.
+
+Scores, ratings, and rankings are decision support only. They are not
+automatic investment advice or buy/sell instructions.
