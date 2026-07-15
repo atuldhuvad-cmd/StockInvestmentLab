@@ -10,6 +10,7 @@ RECOMMENDED DAILY WORKFLOW
 1. Open Overview for the current factual snapshot.
 2. Record dated Portfolio BUY and SELL transactions when they occur.
 3. Review Watchlist and Delivery candidates.
+   In Delivery, import an offline OHLCV CSV when you want Technical Trend.
 4. Record supporting work in Research and review Fundamentals.
 5. Import a Macro JSON snapshot when new data is available.
 6. Use Intraday as a discipline log, then check Settings if limits change.
@@ -46,3 +47,17 @@ private financial information.
 
 Scores, ratings, and rankings are decision support only. They are not
 automatic investment advice or buy/sell instructions.
+
+OFFLINE PRICE HISTORY
+In Delivery, use Import Price History CSV. Select a local CSV containing:
+Date, Open, High, Low, Close, Volume. Common capitalization and yfinance-style
+CSV headers are accepted. A ticker such as TCS or TCS.NS can be entered, or
+inferred from a ticker-based filename.
+
+Use at least 250 valid trading rows when possible. Technical Trend requires
+200 rows for a complete evaluation; 50-199 rows are Limited Technical Data,
+and fewer than 50 rows are Not Evaluated. Imported rows stay in local
+IndexedDB and are included in normal JSON backups.
+
+Technical Trend is entry guidance only. Strong Trend is not an automatic buy
+signal or investment advice.

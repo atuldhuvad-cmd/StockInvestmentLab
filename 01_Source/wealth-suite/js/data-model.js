@@ -102,9 +102,17 @@ const WealthData = (function () {
         // ticker: { price, asOf }
       },
 
+      // Offline OHLCV history imported from user-selected CSV files. Keys use
+      // normalized lookup symbols (e.g. TCS.NS -> TCS) without modifying the
+      // securities/fundamentals ticker stored elsewhere. Older backups omit
+      // this field and receive an empty object through replaceAll().
+      priceHistory: {
+        // TICKER: { symbol, sourceSymbol, importedAt, rows: [{date,open,high,low,close,volume}] }
+      },
+
       // meta: bookkeeping about the data itself, not the data
       meta: {
-        schemaVersion: 3,
+        schemaVersion: 4,
         lastSavedAt: null
       }
     };
@@ -125,6 +133,7 @@ const WealthData = (function () {
     getResearchLibrary: () => state.researchLibrary,
     getSetting: (key) => state.settings[key],
     getAllSettings: () => state.settings,
+    getPriceHistory: (ticker) => (state.priceHistory || {})[ticker],
 
     // ---- Write access — always through these, never direct mutation from
     // a module, so there is exactly one place that changes shape, ever ----
@@ -146,7 +155,7 @@ const WealthData = (function () {
       state.holdings = holdings;
       if (!Array.isArray(state.portfolioTransactions)) state.portfolioTransactions = [];
       state.portfolioTransactions.push(transaction);
-      state.meta = { ...state.meta, schemaVersion: 3 };
+      state.meta = { ...state.meta, schemaVersion: Math.max(Number(state.meta && state.meta.schemaVersion) || 0, 3) };
       return transaction.id;
     },
     addWatchlistItem(item) {
@@ -177,6 +186,11 @@ const WealthData = (function () {
     },
     updateSetting(key, value) {
       state.settings[key] = value;
+    },
+    setPriceHistory(ticker, record) {
+      if (!state.priceHistory || typeof state.priceHistory !== "object") state.priceHistory = {};
+      state.priceHistory[ticker] = record;
+      state.meta = { ...state.meta, schemaVersion: Math.max(Number(state.meta && state.meta.schemaVersion) || 0, 4) };
     },
 
     // ---- Whole-state operations, used by the persistence layer ----

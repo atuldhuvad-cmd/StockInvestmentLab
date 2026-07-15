@@ -83,9 +83,27 @@ const DeliveryScreenerModule = (function () {
     };
   }
 
-  // ---- Pillar 4: Technical Trend — "Not available" per the Standalone Value Rule ----
-  function technicalTrendPillar() {
-    return { score: null, available: false, subFactors: [{ label: "Waiting for price history data", score: null }] };
+  // ---- Pillar 4: Technical Trend — evaluated only from imported OHLCV ----
+  function technicalTrendPillar(ticker) {
+    const symbol = PriceHistory.normalizeSymbol(ticker);
+    const record = WealthData.getPriceHistory(symbol);
+    const analysis = PriceHistory.calculate(record && Array.isArray(record.rows) ? record.rows : []);
+    const available = analysis.coverage === "Complete";
+    return {
+      score: available ? analysis.score : null,
+      available,
+      coverage: analysis.coverage,
+      status: analysis.status,
+      rowCount: analysis.rowCount,
+      latestDate: analysis.latestDate,
+      metrics: analysis,
+      subFactors: analysis.rowCount
+        ? analysis.conditions.map(condition => ({
+            label: `${condition.passed ? "Passed" : "Failed"}: ${condition.label}`,
+            score: available ? (condition.passed ? condition.points : 0) : null
+          }))
+        : [{ label: "Waiting for price history data", score: null }]
+    };
   }
 
   // ---- Pillar 5: Risk — red flags, debt extremity, pledge trend ----
@@ -148,15 +166,20 @@ const DeliveryScreenerModule = (function () {
     const bq = businessQualityPillar(fundamentals.qualitative);
     const fs = financialStrengthPillar(ratios);
     const val = valuationPillar(ratios, bq.score);
-    const tech = technicalTrendPillar();
+    const tech = technicalTrendPillar(ticker);
     const risk = riskPillar(fundamentals, ratios);
 
     const pillars = { businessQuality: bq, financialStrength: fs, valuation: val, technicalTrend: tech, risk };
     const overall = computeOverall(pillars);
-    const rating = computeRating(overall, risk.score, risk.flags.length);
+    const completeModelRating = computeRating(overall, risk.score, risk.flags.length);
+    const rating = !tech.available && completeModelRating === "Strong Buy" ? "Buy" : completeModelRating;
     const { strengths, risks } = rankStrengthsAndRisks(pillars);
 
-    return { ticker, security, overall: Math.round(overall * 10) / 10, rating, pillars, strengths, risks, ratios, redFlagCount: risk.flags.length };
+    return {
+      ticker, security, overall: Math.round(overall * 10) / 10, rating, pillars, strengths, risks, ratios,
+      redFlagCount: risk.flags.length, assessment: tech.available ? "Complete" : "Partial",
+      pillarCoverage: tech.available ? "5 of 5" : "4 of 5"
+    };
   }
 
   function ratingColor(rating) {
@@ -185,9 +208,17 @@ const DeliveryScreenerModule = (function () {
         <h2>Delivery Screener</h2>
         <p class="module-sub">Which companies deserve your research this week — not a buy/sell signal, a shortlist to start from.</p>
       </div>
+      <div class="panel" id="ds-price-import-panel" style="margin-bottom:20px;max-width:none;">
+        <div class="section-head" style="margin-bottom:12px;"><span class="section-title" style="font-size:15px;">Import Price History CSV</span></div>
+        <p class="module-sub" style="margin-bottom:14px;">Offline OHLCV only. Required columns: Date, Open, High, Low, Close, Volume. Ticker can be entered below or inferred from filenames such as TCS_5Y.csv or TCS.NS.csv.</p>
+        <div class="field-row"><label for="ds-price-symbol">Ticker (optional if filename identifies it)</label><input type="text" id="ds-price-symbol" style="text-transform:uppercase" placeholder="e.g. TCS or TCS.NS"></div>
+        <div class="field-row"><label for="ds-price-file">CSV file</label><input type="file" id="ds-price-file" accept=".csv,text/csv"></div>
+        <button class="btn" id="ds-price-import-btn">Import CSV</button>
+        <div class="module-sub" id="ds-price-import-result" style="margin-top:10px;"></div>
+      </div>
       <div class="specimen">
         <h2>Reading this screen</h2>
-        <p>Five pillars, always visible: Business Quality, Financial Strength, Valuation, Technical Trend, Risk. <strong>Technical Trend currently shows "Not available"</strong> — this app has no price history data source yet, so rather than compute it on fake data, it's honestly marked missing. The Overall Score re-weights across the other four pillars until real price data exists.</p>
+        <p>Five pillars, always visible: Business Quality, Financial Strength, Valuation, Technical Trend, Risk. Technical Trend uses only an OHLCV CSV you select locally. Missing or limited history keeps the assessment partial and prevents the highest recommendation; 200 or more valid rows completes the five-pillar model.</p>
         <p class="final">Ranked from your ${allCandidates.length} companies with fundamentals data. A company with no fundamentals data can't be ranked — add it in Fundamentals first.</p>
       </div>
       ${ListControls.renderControlsBar("ds-controls", ListControls.uniqueSectors(allCandidates, c => c.security && c.security.sector), sortOptions, "overall")}
@@ -197,6 +228,35 @@ const DeliveryScreenerModule = (function () {
 
     const state = { searchText: "", sector: "All", sortKey: "overall", sortDir: "desc" };
     let visibleCount = PAGE_SIZE;
+
+    const fileInput = container.querySelector("#ds-price-file");
+    const symbolInput = container.querySelector("#ds-price-symbol");
+    container.querySelector("#ds-price-import-btn").addEventListener("click", async () => {
+      const file = fileInput.files[0];
+      if (!file) { App.showStatus("Choose an OHLCV CSV file first", "error"); return; }
+      const resultEl = container.querySelector("#ds-price-import-result");
+      try {
+        const parsed = PriceHistory.parseCSV(await file.text(), { fileName: file.name, symbol: symbolInput.value });
+        if (!parsed.ok) { App.showStatus(parsed.error, "error"); resultEl.textContent = parsed.error; return; }
+        if (!parsed.symbol) { App.showStatus("Enter a ticker or use a ticker-based filename", "error"); return; }
+        if (!parsed.rows.length) { App.showStatus("CSV contains no valid OHLCV rows", "error"); return; }
+        WealthData.setPriceHistory(parsed.symbol, {
+          symbol: parsed.symbol,
+          sourceSymbol: String(symbolInput.value || PriceHistory.inferSymbolFromFilename(file.name)).trim(),
+          importedAt: new Date().toISOString(),
+          rows: parsed.rows
+        });
+        await App.saveNow(false);
+        const technical = PriceHistory.calculate(parsed.rows);
+        App.showStatus(`Imported ${parsed.rows.length} price rows for ${parsed.symbol}`, "ok");
+        render(container);
+        const refreshedResult = container.querySelector("#ds-price-import-result");
+        if (refreshedResult) refreshedResult.textContent = `${parsed.symbol}: ${parsed.rows.length} valid rows · ${technical.coverage} · latest ${technical.latestDate || "—"}`;
+      } catch (error) {
+        App.showStatus("Price history import failed: " + error.message, "error");
+        resultEl.textContent = error.message;
+      }
+    });
 
     function refreshList() {
       const filtered = ListControls.filterAndSort(allCandidates, {
@@ -226,6 +286,13 @@ const DeliveryScreenerModule = (function () {
           btn.textContent = isOpen ? "Show breakdown ▾" : "Hide breakdown ▴";
         });
       });
+      listEl.querySelectorAll("[data-import-price]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          symbolInput.value = btn.dataset.importPrice;
+          fileInput.click();
+          container.querySelector("#ds-price-import-panel").scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      });
     }
 
     container.querySelector("#ds-show-more").addEventListener("click", () => { visibleCount += PAGE_SIZE; refreshList(); });
@@ -244,6 +311,42 @@ const DeliveryScreenerModule = (function () {
     `;
   }
 
+  function formatMetric(value, suffix = "", decimals = 1) {
+    return typeof value === "number" && Number.isFinite(value) ? value.toFixed(decimals) + suffix : "—";
+  }
+
+  function technicalDetail(candidate) {
+    const technical = candidate.pillars.technicalTrend;
+    const metrics = technical.metrics;
+    if (!technical.rowCount) {
+      return `<div class="specimen" style="margin-top:14px;">
+        <h2>Technical Trend — Waiting for price history data</h2>
+        <p>Assessment: Partial · Coverage: Missing · 4 of 5 pillars. No technical score is inferred without imported OHLCV history.</p>
+        <button class="btn" data-import-price="${candidate.ticker}" style="margin-top:8px;">Import CSV for ${candidate.ticker}</button>
+      </div>`;
+    }
+    const conditionList = metrics.conditions.map(condition =>
+      `<li style="color:${condition.passed ? 'var(--gain)' : 'var(--loss)'};">${condition.passed ? '✓' : '✗'} ${condition.label}${technical.available ? ` (${condition.passed ? '+' + condition.points : '+0'})` : ''}</li>`
+    ).join("");
+    return `<div class="specimen" style="margin-top:14px;">
+      <h2>Technical Trend — ${technical.coverage === 'Limited' ? 'Limited Technical Data' : technical.status}</h2>
+      <p>Assessment: ${candidate.assessment} · Coverage: ${technical.coverage} · ${candidate.pillarCoverage} pillars · ${technical.rowCount} valid rows · latest ${technical.latestDate || '—'}</p>
+      <div class="ratio-grid" style="margin:12px 0;">
+        <div class="ratio-cell"><div class="ratio-label">Technical score</div><div class="ratio-value">${technical.score === null ? '—' : technical.score}</div></div>
+        <div class="ratio-cell"><div class="ratio-label">Latest close</div><div class="ratio-value">${formatMetric(metrics.latestClose, '', 2)}</div></div>
+        <div class="ratio-cell"><div class="ratio-label">50 DMA</div><div class="ratio-value">${formatMetric(metrics.dma50, '', 2)}</div></div>
+        <div class="ratio-cell"><div class="ratio-label">200 DMA</div><div class="ratio-value">${formatMetric(metrics.dma200, '', 2)}</div></div>
+        <div class="ratio-cell"><div class="ratio-label">RSI 14</div><div class="ratio-value">${formatMetric(metrics.rsi14)}</div></div>
+        <div class="ratio-cell"><div class="ratio-label">52-week high</div><div class="ratio-value">${formatMetric(metrics.high52Week, '', 2)}</div></div>
+        <div class="ratio-cell"><div class="ratio-label">Distance from high</div><div class="ratio-value">${formatMetric(metrics.distanceFrom52WeekHigh, '%')}</div></div>
+        <div class="ratio-cell"><div class="ratio-label">Latest volume / 20D avg</div><div class="ratio-value">${formatMetric(metrics.latestVolumeVs20DayAverage, 'x', 2)}</div></div>
+      </div>
+      <ul class="flag-list" style="color:var(--paper-dim);">${conditionList}</ul>
+      ${technical.available ? `<p class="final">Trend status is entry guidance only, not an automatic buy signal.</p>` : `<p class="final">At least 200 valid rows are required before Technical Trend contributes to the model.</p>`}
+      <button class="btn" data-import-price="${candidate.ticker}" style="margin-top:8px;">Replace CSV for ${candidate.ticker}</button>
+    </div>`;
+  }
+
   function renderCard(c, rank) {
     const cardId = `ds-detail-${c.ticker}`;
     return `
@@ -258,6 +361,7 @@ const DeliveryScreenerModule = (function () {
               <div class="n">${c.overall}</div>
               <div class="l">overall</div>
               <div class="chip ${ratingColor(c.rating)}" style="font-family:var(--mono);font-size:11px;padding:3px 10px;border:1px solid var(--rule-bright);margin-top:6px;display:inline-block;">${c.rating}</div>
+              <div class="l" style="margin-top:5px;">${c.assessment} · ${c.pillarCoverage} pillars</div>
             </div>
           </div>
 
@@ -285,6 +389,8 @@ const DeliveryScreenerModule = (function () {
               ${pillarRow("Risk", c.pillars.risk)}
             </div>
 
+            ${technicalDetail(c)}
+
             <div class="module-sub" style="margin-top:14px;font-weight:600;color:var(--paper);">Full calculation trace</div>
             ${Object.entries(c.pillars).map(([key, p]) => `
               <div style="margin-top:8px;">
@@ -308,5 +414,5 @@ const DeliveryScreenerModule = (function () {
     `;
   }
 
-  return { render, computeCandidate, businessQualityPillar, financialStrengthPillar, valuationPillar, riskPillar, computeOverall, computeRating };
+  return { render, computeCandidate, businessQualityPillar, financialStrengthPillar, valuationPillar, technicalTrendPillar, riskPillar, computeOverall, computeRating };
 })();

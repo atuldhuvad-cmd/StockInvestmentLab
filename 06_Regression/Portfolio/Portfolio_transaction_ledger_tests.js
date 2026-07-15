@@ -127,7 +127,7 @@ WealthData.reset();
 WealthData.commitPortfolioTransaction(buy1.holdings, buy1.transaction);
 assertExact("Ledger commit writes holding snapshot", WealthData.getHoldings().length, 1);
 assertExact("Ledger commit appends transaction", WealthData.getPortfolioTransactions().length, 1);
-assertExact("Ledger commit records schema version 3", WealthData.get().meta.schemaVersion, 3);
+assertExact("Ledger commit does not downgrade current schema", WealthData.get().meta.schemaVersion, 4);
 
 console.log(`\n=== SUMMARY: ${passed} passed, ${failed} failed ===`);
 process.exit(failed ? 1 : 0);

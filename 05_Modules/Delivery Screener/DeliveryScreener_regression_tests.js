@@ -49,6 +49,7 @@ function interp(value, points) {
 
 eval(fs.readFileSync(path.join(__dirname,'js/data-model.js'),'utf8') + '\nglobal.WealthData = WealthData;');
 eval(fs.readFileSync(path.join(__dirname,'js/company-calculations.js'),'utf8') + '\nglobal.CompanyCalculations = CompanyCalculations;');
+eval(fs.readFileSync(path.join(__dirname,'js/price-history.js'),'utf8') + '\nglobal.PriceHistory = PriceHistory;');
 global.document = {};
 eval(fs.readFileSync(path.join(__dirname,'js/modules/delivery-screener.js'),'utf8') + '\nglobal.DeliveryScreenerModule = DeliveryScreenerModule;');
 eval(fs.readFileSync(path.join(__dirname,'js/seed-data.js'),'utf8') + '\nglobal.SEED_FUNDAMENTALS = SEED_FUNDAMENTALS;');
@@ -83,7 +84,7 @@ const valNoPE = DeliveryScreenerModule.valuationPillar({ roe:10, roce:10, debtEq
 assertExact("DS-05c","Valuation score when P/E is null", valNoPE.score, 50);
 assertExact("DS-05c-b","gapPct is null when P/E unavailable", valNoPE.gapPct, null);
 
-console.log("\n=== DS-06: Technical Trend — trivial, always unavailable ===");
+console.log("\n=== DS-06: Technical Trend — unavailable without imported history ===");
 assertExact("DS-06","Technical Trend score", tcs.pillars.technicalTrend.score, null);
 assertExact("DS-06b","Technical Trend available flag", tcs.pillars.technicalTrend.available, false);
 
@@ -102,7 +103,7 @@ assertClose("DS-08b","TCS Overall Score (independently re-normalized)", tcs.over
 
 console.log("\n=== DS-09: Rating thresholds and override ===");
 assertTrue("DS-09a","BAJFINANCE rated Avoid despite mid-range overall score (red-flag override)", bajaj.rating === "Avoid" && bajaj.overall >= 45);
-assertTrue("DS-09b","TCS rated Strong Buy (high overall + high risk score)", tcs.rating === "Strong Buy");
+assertTrue("DS-09b","TCS partial assessment blocks the highest recommendation", tcs.rating === "Buy" && tcs.assessment === "Partial");
 
 console.log("\n=== DS-10: Ranking — zero NaN across all 10 real companies, strengths/risks bounded at 3 ===");
 const all = Object.keys(SEED_FUNDAMENTALS).map(t => DeliveryScreenerModule.computeCandidate(t));

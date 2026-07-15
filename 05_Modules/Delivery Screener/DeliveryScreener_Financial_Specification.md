@@ -36,8 +36,11 @@
 - **Business rule:** Explicitly labeled in the original methodology document as a simplified heuristic, not a DCF — this specification inherits that same honest framing rather than re-litigating it.
 
 ## DS-06: Technical Trend Pillar
-- **Amendment 6 classification: New Implementation** (trivial). Always returns `{ score: null, available: false }` — a deliberate stub, not a bug, per the Standalone Value Rule and the Import-Driven Data Rule (no price-history data source exists in this app).
-- **No numerical verification needed** — there's no formula to verify, only the constant "unavailable" state, which Phase 3 will confirm behaves correctly through the re-weighting logic (DS-08).
+- **Amendment 6 classification: New Implementation.** Uses only locally imported OHLCV rows; it never fetches or fabricates market data.
+- **Coverage:** fewer than 50 valid rows = Missing / Not Evaluated; 50–199 = Limited / Not Evaluated; 200 or more = Complete and eligible for scoring.
+- **Inputs:** latest close, 50-day simple moving average, 200-day simple moving average, Wilder RSI 14, rolling 252-row high, 20-day average volume, and latest volume.
+- **Score:** price above 200 DMA = 25; price above 50 DMA = 20; 50 DMA above 200 DMA = 20; RSI 45–70 inclusive = 15; price within 20% of the 52-week high = 10; latest volume at/above 20-day average = 10.
+- **Status:** 80–100 Strong Trend; 60–79 Constructive; 40–59 Neutral / Wait; below 40 Weak Trend; insufficient rows Not Evaluated. Strong Trend is entry guidance, not an automatic buy signal.
 
 ## DS-07: Risk Pillar
 - **Sub-calculation 1 (red flags): Shared Implementation.** Calls `CompanyCalculations.detectRedFlags()` directly — the same function verified as FIN-F10. Verified Consistent.
@@ -46,12 +49,13 @@
 
 ## DS-08: Overall Score — Weighted Re-Normalization
 - **Amendment 6 classification: New Implementation.**
-- **Formula:** `computeOverall()` filters pillars with `score !== null`, sums their weights, and re-normalizes each available pillar's contribution by `weight / totalAvailableWeight` — this is the mechanism that lets Technical Trend (DS-06) be "unavailable" without breaking the overall score.
-- **Business rule, already partially verified conceptually:** with Technical Trend always unavailable currently, the effective weights become Business Quality 25/85≈29.4%, Financial Strength 25/85≈29.4%, Valuation 20/85≈23.5%, Risk 15/85≈17.6% — this arithmetic needs independent numerical verification in Phase 3, not just restated here as presumed-correct.
+- **Formula:** `computeOverall()` filters pillars with `score !== null`, sums their weights, and re-normalizes each available pillar's contribution by `weight / totalAvailableWeight`.
+- **Business rule:** Missing/Limited technical history retains the verified four-pillar 85% re-weighting. Complete history supplies the fifth score and uses all original weights, totaling 100%.
 
 ## DS-09: Rating
 - **Amendment 6 classification: New Implementation.**
 - **Formula:** `computeRating()` — Avoid if `overall < 45` OR `riskScore < 30` OR `redFlagCount >= 3`; else Strong Buy if `overall >= 80` AND `riskScore >= 60`; else Buy if `overall >= 65`; else Watch if `overall >= 45`; else Avoid.
+- **Partial-assessment guard:** `computeRating()` itself is unchanged. When Technical Trend is Missing/Limited, `computeCandidate()` caps a would-be Strong Buy at Buy so the highest recommendation requires 5-of-5 pillar coverage.
 - **Dependency:** Every input here (`overall`, `riskScore`, `redFlagCount`) traces back through DS-08, DS-07, and ultimately DS-03/DS-04's drift-affected values — a rating could be wrong not because the rating logic itself is wrong, but because what feeds it is.
 
 ## DS-10: Top 3 Strengths / Top 3 Risks
