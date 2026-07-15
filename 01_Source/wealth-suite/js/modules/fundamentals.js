@@ -32,12 +32,28 @@ const FundamentalsModule = (function () {
   // guarded definition instead of maintaining its own unfixed copy.
   const latestRatios = CompanyCalculations.latestRatios;
 
-  // Historical ROE is presentation-only. Preserve its established truthy
-  // equity guard and exact one-decimal/placeholder output; this intentionally
-  // does not change the stricter latestRatios() behavior above.
+  // Historical display validation is presentation-only. It never normalizes
+  // or rewrites the underlying financial records and does not affect the
+  // stricter latestRatios() behavior above or Delivery Screener calculations.
   function formatHistoricalRoe(year) {
-    const roe = year.totalEquity ? (year.netProfit / year.totalEquity) * 100 : null;
-    return `${roe === null ? "—" : roe.toFixed(1)}%`;
+    if (
+      typeof year?.netProfit !== "number" ||
+      !Number.isFinite(year.netProfit) ||
+      typeof year?.totalEquity !== "number" ||
+      !Number.isFinite(year.totalEquity) ||
+      year.totalEquity === 0
+    ) {
+      return "—%";
+    }
+
+    const roe = (year.netProfit / year.totalEquity) * 100;
+    return Number.isFinite(roe) ? `${roe.toFixed(1)}%` : "—%";
+  }
+
+  function formatHistoricalCurrency(value, suffix = "") {
+    return typeof value === "number" && Number.isFinite(value)
+      ? `₹${value.toLocaleString("en-IN")}${suffix}`
+      : "—";
   }
 
   const qualityScore = CompanyCalculations.qualityScore;
@@ -151,8 +167,8 @@ const FundamentalsModule = (function () {
                 ${fundamentals.years.slice().sort((a,b)=>a.year-b.year).map(y => `
                   <tr>
                     <td>FY${y.year}</td>
-                    <td>₹${y.revenue.toLocaleString('en-IN')}</td>
-                    <td>₹${y.netProfit.toLocaleString('en-IN')}</td>
+                    <td>${formatHistoricalCurrency(y.revenue)}</td>
+                    <td>${formatHistoricalCurrency(y.netProfit)}</td>
                     <td>${formatHistoricalRoe(y)}</td>
                     <td>${y.promoterHolding}%</td>
                   </tr>
@@ -165,8 +181,8 @@ const FundamentalsModule = (function () {
             ${fundamentals.years.slice().sort((a,b)=>b.year-a.year).map(y => `
               <div class="data-card">
                 <div class="data-card-title">FY${y.year}</div>
-                <div class="data-card-row"><span class="k">Revenue</span><span class="v">₹${y.revenue.toLocaleString('en-IN')} Cr</span></div>
-                <div class="data-card-row"><span class="k">Net Profit</span><span class="v">₹${y.netProfit.toLocaleString('en-IN')} Cr</span></div>
+                <div class="data-card-row"><span class="k">Revenue</span><span class="v">${formatHistoricalCurrency(y.revenue, " Cr")}</span></div>
+                <div class="data-card-row"><span class="k">Net Profit</span><span class="v">${formatHistoricalCurrency(y.netProfit, " Cr")}</span></div>
                 <div class="data-card-row"><span class="k">ROE</span><span class="v">${formatHistoricalRoe(y)}</span></div>
                 <div class="data-card-row"><span class="k">Promoter Holding</span><span class="v">${y.promoterHolding}%</span></div>
               </div>
@@ -179,5 +195,5 @@ const FundamentalsModule = (function () {
     `;
   }
 
-  return { render, formatHistoricalRoe };
+  return { render, formatHistoricalRoe, formatHistoricalCurrency };
 })();

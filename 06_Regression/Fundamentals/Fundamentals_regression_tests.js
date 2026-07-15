@@ -47,6 +47,7 @@ eval(fs.readFileSync(path.join(suiteRoot, 'js/modules/fundamentals.js'), 'utf8')
 // stale source that no longer contains the function definition.
 const latestRatios = CompanyCalculations.latestRatios;
 const formatHistoricalRoe = FundamentalsModule.formatHistoricalRoe;
+const formatHistoricalCurrency = FundamentalsModule.formatHistoricalCurrency;
 
 function makeYears(overrides) {
   const base = { revenue: 10000, ebit: 1500, netProfit: 1000, totalEquity: 5000, totalDebt: 1000,
@@ -57,10 +58,28 @@ function makeYears(overrides) {
 
 console.log("=== TC-F00: Historical ROE presentation compatibility ===");
 assertExact("TC-F00a", "Positive equity keeps one-decimal historical ROE", formatHistoricalRoe({ netProfit: 500, totalEquity: 2000 }), "25.0%");
-assertExact("TC-F00b", "Zero equity keeps the existing placeholder", formatHistoricalRoe({ netProfit: 500, totalEquity: 0 }), "—%");
-assertExact("TC-F00c", "Missing equity keeps the existing placeholder", formatHistoricalRoe({ netProfit: 500 }), "—%");
-assertExact("TC-F00d", "Negative equity keeps the existing historical formula", formatHistoricalRoe({ netProfit: 500, totalEquity: -2000 }), "-25.0%");
-assertExact("TC-F00e", "Missing net profit keeps the existing display behavior", formatHistoricalRoe({ totalEquity: 2000 }), "NaN%");
+assertExact("TC-F00b", "Zero profit remains 0.0%", formatHistoricalRoe({ netProfit: 0, totalEquity: 2000 }), "0.0%");
+assertExact("TC-F00c", "Negative profit keeps its existing result", formatHistoricalRoe({ netProfit: -500, totalEquity: 2000 }), "-25.0%");
+[
+  ["null", null], ["undefined", undefined], ["NaN", NaN],
+  ["Infinity", Infinity], ["-Infinity", -Infinity], ["numeric-looking text", "500"]
+].forEach(([label, netProfit], i) => {
+  assertExact(`TC-F00p${i + 1}`, `${label} profit renders placeholder`, formatHistoricalRoe({ netProfit, totalEquity: 2000 }), "—%");
+});
+assertExact("TC-F00p7", "Missing profit renders placeholder", formatHistoricalRoe({ totalEquity: 2000 }), "—%");
+assertExact("TC-F00e1", "Zero equity keeps the existing placeholder", formatHistoricalRoe({ netProfit: 500, totalEquity: 0 }), "—%");
+assertExact("TC-F00e2", "Missing equity keeps the existing placeholder", formatHistoricalRoe({ netProfit: 500 }), "—%");
+assertExact("TC-F00e3", "Negative equity keeps the existing historical formula", formatHistoricalRoe({ netProfit: 500, totalEquity: -2000 }), "-25.0%");
+[
+  ["NaN", NaN], ["Infinity", Infinity], ["text", "2000"]
+].forEach(([label, totalEquity], i) => {
+  assertExact(`TC-F00e${i + 4}`, `${label} equity renders placeholder`, formatHistoricalRoe({ netProfit: 500, totalEquity }), "—%");
+});
+assertExact("TC-F00c1", "Valid historical currency keeps existing desktop style", formatHistoricalCurrency(12345.5), "₹12,345.5");
+assertExact("TC-F00c2", "Valid historical currency keeps existing mobile suffix", formatHistoricalCurrency(12345.5, " Cr"), "₹12,345.5 Cr");
+[null, undefined, NaN, Infinity, -Infinity, "12345"].forEach((value, i) => {
+  assertExact(`TC-F00c${i + 3}`, "Invalid historical currency renders placeholder", formatHistoricalCurrency(value, " Cr"), "—");
+});
 
 console.log("=== TC-F01: Normal case ===");
 const r1 = latestRatios({ years: makeYears(i => ({ revenue: 10000 + i * 1000, netProfit: 1000 * (1 + i * 0.12) })) });
@@ -110,6 +129,13 @@ console.log("\n=== TC-F10: Regression baseline — BAJFINANCE red flags against 
 eval(fs.readFileSync(path.join(suiteRoot, 'js/seed-data.js'), 'utf8') + '\nglobal.SEED_FUNDAMENTALS = SEED_FUNDAMENTALS;');
 const bajajFlags = CompanyCalculations.detectRedFlags({ years: SEED_FUNDAMENTALS.BAJFINANCE.years, auditorLog: SEED_FUNDAMENTALS.BAJFINANCE.auditorLog });
 assertExact("TC-F10", "BAJFINANCE red flag count (established baseline from prior session verification)", bajajFlags.length, 4);
+const validHistoricalOutputsUnchanged = Object.values(SEED_FUNDAMENTALS).every(f => f.years.every(y =>
+  formatHistoricalRoe(y) === `${((y.netProfit / y.totalEquity) * 100).toFixed(1)}%` &&
+  formatHistoricalCurrency(y.revenue) === `₹${y.revenue.toLocaleString("en-IN")}` &&
+  formatHistoricalCurrency(y.netProfit, " Cr") === `₹${y.netProfit.toLocaleString("en-IN")} Cr`
+));
+assertExact("TC-F10b", "All 40 valid historical period outputs remain unchanged", validHistoricalOutputsUnchanged, true);
+assertClose("TC-F10c", "Latest TCS ROE remains unchanged", latestRatios(SEED_FUNDAMENTALS.TCS).roe, 46.11525550167847);
 
 console.log(`\n=== INTERIM SUMMARY (before Net Margin closure below): ${passCount} passed, ${failCount} failed ===`);
 

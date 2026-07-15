@@ -14,7 +14,9 @@
 
 ### Historical ROE presentation
 
-The desktop year table and mobile year cards share `formatHistoricalRoe(year)`. This presentation helper deliberately preserves the established historical formula and formatting: truthy ending equity permits `netProfit / totalEquity × 100`, rendered to one decimal with `%`; zero or missing equity renders `—%`. It does not call or alter the stricter latest-year ROE calculation, and it is not consumed by Delivery Screener scoring or rankings.
+The desktop year table and mobile year cards share `formatHistoricalRoe(year)`. For finite numeric inputs, the helper preserves the established historical formula and formatting: `netProfit / totalEquity × 100`, rendered to one decimal with `%`; zero equity or incomplete, non-numeric, or non-finite presentation inputs render `—%`. Negative finite equity retains its existing mathematical result. Historical revenue and net profit use the same local currency formatter in both views; incomplete or invalid values render `—` without throwing.
+
+These checks are display validation only. No financial records are normalized or rewritten, and IndexedDB and backup data remain unchanged. The helper does not call or alter the stricter latest-year ROE calculation and is not consumed by Delivery Screener scoring, ratings, or rankings.
 
 ## FIN-F02: Return on Capital Employed (ROCE)
 - **Formula (fixed 2026-07-12, FUND-D01):** `capEmployed = totalAssets − (currentLiabilities || 0)`; `roce = (capEmployed && capEmployed > 0) ? (ebit / capEmployed) × 100 : null`
