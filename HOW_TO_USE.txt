@@ -1,4 +1,4 @@
-WEALTH INTELLIGENCE SUITE v1.0 - QUICK GUIDE
+WEALTH INTELLIGENCE SUITE v1.3 - QUICK GUIDE
 ============================================================
 
 OPEN THE APPLICATION
@@ -13,10 +13,9 @@ RECOMMENDED DAILY WORKFLOW
    In Delivery, import an offline OHLCV CSV when you want Technical Trend.
 4. Record supporting work in Research and review Fundamentals.
 5. Import a Macro JSON snapshot when new data is available.
-6. Use Intraday as a discipline log, then check Settings if limits change.
-7. Click Save, then export a backup regularly.
+6. Click Save, then export a backup regularly.
 
-MODULES
+ACTIVE MODULES (7)
 Overview      Read-only daily summary of existing suite data.
 Portfolio     Holdings, BUY/SELL ledger, weighted cost, and realised/unrealised gain.
 Watchlist     Companies to watch, study, buy soon, or reject.
@@ -24,8 +23,11 @@ Delivery      Existing ranked decision-support scores and ratings.
 Research      Company notes, cases, updates, summaries, and decisions.
 Fundamentals  Financial history, ratios, quality context, and red flags.
 Macro         Factual imported Indian macro readings.
-Intraday      Trade-discipline checklist, log, and allocation ceiling.
-Settings      Intraday allocation and minimum risk/reward settings.
+
+INTRADAY SEPARATION
+Intraday trading is being developed as a separate satellite project. Existing
+legacy Intraday data remains preserved in backups. The Wealth Suite does not
+display or rewrite legacy Intraday trades or their two legacy settings.
 
 STORAGE AND BACKUPS
 The suite stores data in IndexedDB inside the local browser profile used to

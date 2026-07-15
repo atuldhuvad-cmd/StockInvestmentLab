@@ -6,19 +6,31 @@
 
 A verified personal wealth-management application (`01_Source\wealth-suite`), built pure HTML/CSS/JS with IndexedDB persistence, alongside a formal, evidence-based verification methodology applied module by module.
 
-## Current state (2026-07-13)
+## Active application (wealth-suite-v1.3)
+
+The Wealth Intelligence Suite has seven active navigation modules, in this
+order: Overview, Portfolio, Watchlist, Delivery, Research, Fundamentals, and
+Macro. Overview opens by default.
+
+Intraday trading is being developed as a separate satellite project. Existing
+legacy Intraday data remains preserved in backups. Intraday and Settings source,
+verification evidence, state fields, and regression suites remain in this
+repository for compatibility until the standalone project is created and
+verified; neither module is loaded or registered in the active application.
+
+## Historical module-verification state (2026-07-13)
 
 | Module | Status | Version |
 |---|---|---|
 | Portfolio | Frozen | v1.0 |
 | Fundamentals | Frozen | v1.0 |
 | Delivery Screener | Frozen | v1.0 |
-| Intraday | Frozen | v1.0 |
+| Intraday | Frozen; inactive in Wealth Suite UI | v1.0 |
 | Research | Frozen | v1.0 |
 | Macro | Pending | v0.0 |
 | Watchlist | Pending | v0.0 |
 | Persistence | Pending | v0.0 |
-| Settings | Pending | v0.0 |
+| Settings | Inactive in Wealth Suite UI | v0.0 |
 
 Regression: **91/91 PASS**, confirmed by real execution. First 59 (Portfolio/Fundamentals/Delivery Screener/Intraday) per `07_Session Reports\Session_Report_Laptop_Migration.md`; the additional 32 (Research) confirmed in this same working session — see `05_Modules\Research\Research_Verification_Report.md`.
 
@@ -36,4 +48,6 @@ Regression: **91/91 PASS**, confirmed by real execution. First 59 (Portfolio/Fun
 
 ## Rule for continuing this project
 
-Per the Charter's Golden Rule and the "No Methodology Changes After Module 3" rule: the verification process itself is frozen. From here, only the software changes — apply the same process to Macro next, then Watchlist, Persistence, and Settings, in that order.
+Per the Charter's Golden Rule and the "No Methodology Changes After Module 3"
+rule, the verification process itself remains frozen. Historical Intraday
+evidence stays intact while its future development moves to a separate project.

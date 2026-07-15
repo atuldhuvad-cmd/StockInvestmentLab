@@ -92,8 +92,6 @@ const OverviewModule = (function () {
     const macroDates = macroReadings.map(item => new Date(item.point.date).getTime()).filter(Number.isFinite);
     const latestMacroDate = macroDates.length ? new Date(Math.max(...macroDates)).toISOString() : null;
 
-    const allocation = IntradayModule.computeAllocation();
-
     return {
       portfolio: { count: includedHoldings.length, realisedGain, ...portfolioSummary },
       watchlist: { total: WealthData.getWatchlist().length, counts: watchlistCounts },
@@ -101,11 +99,6 @@ const OverviewModule = (function () {
       research: { ...researchSummary, latest: latestResearch },
       fundamentals: { companyCount: fundamentals.length, latestFiscalYear },
       macro: { latestDate: latestMacroDate, readings: macroReadings },
-      intraday: {
-        allocationPct: WealthData.getSetting("intradaySatelliteAllocationPct"),
-        minRiskRewardRatio: WealthData.getSetting("minRiskRewardRatio"),
-        ceilingAmount: allocation.ceilingAmount
-      },
       dataStatus: {
         indexedDB: "Loaded",
         schemaVersion: state.meta && state.meta.schemaVersion !== undefined ? state.meta.schemaVersion : null,
@@ -184,14 +177,6 @@ const OverviewModule = (function () {
         }).join("")}</div>`
       : `<p class="overview-empty">No Macro snapshots imported yet.</p>`;
 
-    const allocationPct = typeof model.intraday.allocationPct === "number" && Number.isFinite(model.intraday.allocationPct) ? `${model.intraday.allocationPct}%` : "—";
-    const minRiskReward = typeof model.intraday.minRiskRewardRatio === "number" && Number.isFinite(model.intraday.minRiskRewardRatio) ? `${model.intraday.minRiskRewardRatio}:1` : "—";
-    const intraday = `<div class="ratio-grid overview-ratios">
-      ${metric("Allocation ceiling", allocationPct)}
-      ${metric("Minimum risk/reward", minRiskReward)}
-      ${metric("Calculated ceiling", fmtINR(model.intraday.ceilingAmount))}
-    </div>`;
-
     const dataStatus = `<div class="overview-list">
       <div class="overview-list-row"><span>IndexedDB</span><strong>${escapeHtml(model.dataStatus.indexedDB)}</strong></div>
       <div class="overview-list-row"><span>Schema version</span><strong>${model.dataStatus.schemaVersion === null ? "—" : escapeHtml(model.dataStatus.schemaVersion)}</strong></div>
@@ -210,7 +195,6 @@ const OverviewModule = (function () {
         ${section("Research", research)}
         ${section("Fundamentals", fundamentals)}
         ${section("Macro", macro)}
-        ${section("Intraday", intraday)}
         ${section("Data status", dataStatus)}
       </div>
     `;

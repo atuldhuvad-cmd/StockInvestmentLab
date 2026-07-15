@@ -42,19 +42,17 @@
 <!-- Modules -->
 <script src="js/modules/overview.js"></script>
 <script src="js/modules/fundamentals.js"></script>
-<script src="js/modules/settings.js"></script>
 <script src="js/modules/watchlist.js"></script>
 <script src="js/modules/portfolio.js"></script>
 <script src="js/modules/delivery-screener.js"></script>
 <script src="js/modules/research.js"></script>
 <script src="js/modules/macro.js"></script>
-<script src="js/modules/intraday.js"></script>
 
 <!-- Shell (must load after modules, before the registration script below) -->
 <script src="js/app.js"></script>
 
 <script>
-  // Module registration — the only place that knows about all nine modules.
+  // Module registration — the only place that knows about all seven active modules.
   // Adding a module later means one line here, nothing else in this file
   // changes.
   App.registerModule("overview", "Overview", OverviewModule.render, "ready");
@@ -64,8 +62,6 @@
   App.registerModule("research", "Research", ResearchModule.render, "ready");
   App.registerModule("fundamentals", "Fundamentals", FundamentalsModule.render, "ready");
   App.registerModule("macro", "Macro", MacroModule.render, "ready");
-  App.registerModule("intraday", "Intraday", IntradayModule.render, "ready");
-  App.registerModule("settings", "Settings", SettingsModule.render, "ready");
 
   App.init();
 </script>
