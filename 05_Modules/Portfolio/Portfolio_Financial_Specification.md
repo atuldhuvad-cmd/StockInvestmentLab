@@ -1,5 +1,17 @@
 # Portfolio — Financial Specification
 
+## v1.1 Transaction Ledger Rules
+
+- Manual transactions are append-only `BUY` or `SELL` records with positive quantity, positive transaction price, and a mandatory valid, non-future `transactionDate`.
+- Imported/legacy transactions are accepted as stored. A missing date remains missing and displays `Date unavailable`; the application never fabricates one.
+- BUY quantity is added to the current position and average cost is recalculated as `(existing invested cost + buy quantity × buy price) / resulting quantity`.
+- A supplied current snapshot price updates valuation; otherwise an existing holding's current price is preserved. A new holding without a current price retains the existing average-cost fallback from FIN-P00.
+- SELL uses the position's weighted-average cost immediately before the sale. `realisedGain = (sell price − cost basis per unit) × sold quantity`.
+- A partial SELL reduces quantity without changing remaining average cost. A full SELL removes the current holding snapshot while retaining the transaction history.
+- A SELL greater than the available quantity is rejected without changing holdings or history.
+- Delete holding is a permanent data-correction action only. It never creates a SELL transaction or realised gain.
+- Existing legacy holdings without transaction history or dates remain valid and are not rewritten on load.
+
 ## FIN-P01: Current Value (per holding)
 - **Business purpose:** The present market value of one holding, given its quantity and current price.
 - **Formula:** `currentValue = quantity × currentPrice`
@@ -20,7 +32,7 @@
 
 ## FIN-P02: Invested Value (per holding)
 - **Formula:** `investedValue = quantity × avgCost`
-- **Business rules:** `avgCost` is user-entered at holding creation and never recalculated by the app — there is no cost-basis averaging logic for multiple purchases of the same ticker (see Integrity Checklist, duplicate-ticker handling).
+- **Business rules:** Legacy holdings retain their stored `avgCost`. Manual BUY transactions recalculate it using the v1.1 weighted-average rule above; partial SELL transactions leave it unchanged.
 - **Worked example:** 50 shares of TCS at ₹3,850 → investedValue = 50 × 3,850 = **₹192,500**.
 
 ## FIN-P03: Absolute Gain/Loss (per holding)
@@ -67,7 +79,7 @@ Per the framework's instruction to mark undefined rules rather than invent them:
 | Are dividends included in gain calculations? | **NOT SPECIFIED** — no dividend field or logic exists anywhere in the module. |
 | Are brokerage/transaction charges included? | **NOT SPECIFIED** — `avgCost` is a raw user-entered number; whether it includes brokerage is entirely up to how the user chose to enter it, undocumented in the UI. |
 | Are taxes (STCG/LTCG) included or estimated? | **NOT SPECIFIED** — no tax logic exists in this module. (Note: the much earlier standalone Capital Ledger/Portfolio Intelligence artifacts from this session had illustrative tax-rate fields, but none of that carried into this module — worth flagging as a real feature gap, not an oversight to assume away.) |
-| Are realized and unrealized gains separated? | **NOT SPECIFIED / NOT IMPLEMENTED** — only unrealized (current holding) gain is computed. Selling a holding calls `removeHolding()`, which deletes the record entirely with no realized-P&L record created anywhere. Realized gain history does not exist. |
+| Are realized and unrealized gains separated? | **IMPLEMENTED in v1.1** — current holdings retain unrealised gain/loss; SELL ledger records store realised gain/loss using weighted-average cost. |
 | How are stock splits handled? | **NOT SPECIFIED** — no split-adjustment logic. A 1:2 split would require the user to manually halve `avgCost` and double `quantity`; if they don't, gain% will be silently wrong. |
 | How are bonus issues handled? | **NOT SPECIFIED** — same gap as stock splits; no automatic adjustment. |
-| What happens if quantity reaches zero? | **NOT SPECIFIED as a distinct state** — the UI has no "reduce quantity" path at all; only full removal (`removeHolding`) exists. A partial sale cannot currently be recorded. |
+| What happens if quantity reaches zero? | **IMPLEMENTED in v1.1** — a full SELL removes the holding snapshot and retains its SELL history; partial sales reduce quantity. |

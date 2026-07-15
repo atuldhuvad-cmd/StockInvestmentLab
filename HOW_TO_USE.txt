@@ -8,7 +8,7 @@ in place so the launcher can find 01_Source\wealth-suite\index.html.
 
 RECOMMENDED DAILY WORKFLOW
 1. Open Overview for the current factual snapshot.
-2. Update Portfolio prices and holdings when needed.
+2. Record dated Portfolio BUY and SELL transactions when they occur.
 3. Review Watchlist and Delivery candidates.
 4. Record supporting work in Research and review Fundamentals.
 5. Import a Macro JSON snapshot when new data is available.
@@ -17,7 +17,7 @@ RECOMMENDED DAILY WORKFLOW
 
 MODULES
 Overview      Read-only daily summary of existing suite data.
-Portfolio     Holdings, value, gain/loss, and allocation.
+Portfolio     Holdings, BUY/SELL ledger, weighted cost, and realised/unrealised gain.
 Watchlist     Companies to watch, study, buy soon, or reject.
 Delivery      Existing ranked decision-support scores and ratings.
 Research      Company notes, cases, updates, summaries, and decisions.

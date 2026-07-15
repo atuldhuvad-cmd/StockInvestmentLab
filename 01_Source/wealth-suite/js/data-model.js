@@ -44,6 +44,16 @@ const WealthData = (function () {
         // { id, ticker, quantity, avgCost, assetClass, active? }
       ],
 
+      // portfolioTransactions: manual BUY/SELL ledger. Older holdings-only
+      // backups do not contain this array and remain valid through the
+      // replaceAll() default merge. Manual entries always include a valid
+      // transactionDate; imported legacy records may omit it and are shown
+      // as date unavailable rather than being assigned an invented date.
+      portfolioTransactions: [
+        // { id, ticker, type: 'BUY'|'SELL', quantity, price,
+        //   transactionDate?, costBasisPerUnit?, realisedGain?, createdAt? }
+      ],
+
       // watchlist: stocks under consideration, separate from actual holdings
       // (approved refinement — this table did not exist in the original plan)
       watchlist: [
@@ -94,7 +104,7 @@ const WealthData = (function () {
 
       // meta: bookkeeping about the data itself, not the data
       meta: {
-        schemaVersion: 2,
+        schemaVersion: 3,
         lastSavedAt: null
       }
     };
@@ -110,6 +120,7 @@ const WealthData = (function () {
     getSecurity: (ticker) => state.securities[ticker],
     getFundamentals: (ticker) => state.fundamentals[ticker],
     getHoldings: () => state.holdings,
+    getPortfolioTransactions: () => Array.isArray(state.portfolioTransactions) ? state.portfolioTransactions : [],
     getWatchlist: () => state.watchlist,
     getResearchLibrary: () => state.researchLibrary,
     getSetting: (key) => state.settings[key],
@@ -130,6 +141,13 @@ const WealthData = (function () {
     },
     removeHolding(id) {
       state.holdings = state.holdings.filter(h => h.id !== id);
+    },
+    commitPortfolioTransaction(holdings, transaction) {
+      state.holdings = holdings;
+      if (!Array.isArray(state.portfolioTransactions)) state.portfolioTransactions = [];
+      state.portfolioTransactions.push(transaction);
+      state.meta = { ...state.meta, schemaVersion: 3 };
+      return transaction.id;
     },
     addWatchlistItem(item) {
       const id = Date.now() + Math.random();

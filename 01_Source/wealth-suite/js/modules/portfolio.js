@@ -1,11 +1,11 @@
 /* ============================================================================
    Portfolio Module
    ============================================================================
-   "How are my investments doing?" — per the revised roadmap, this is the
-   highest-use module, built accordingly. Works standalone for ANY ticker,
-   not just the 10 with real fundamentals (Standalone Value Rule) — adding a
-   holding never requires fundamentals data to exist first; fundamentals
-   context is a bonus layer shown when available, never a dependency.
+   Current holdings remain the shared snapshot consumed by Overview and
+   Intraday. Manual BUY/SELL entries now also create an append-only ledger:
+   BUY updates weighted-average cost; SELL records realised gain and reduces
+   or closes the holding. Legacy/imported holdings and transactions remain
+   valid without dates. Delete holding is correction-only and never a sale.
 ============================================================================ */
 
 const PortfolioModule = (function () {
@@ -15,7 +15,7 @@ const PortfolioModule = (function () {
   function computeRow(holding) {
     const security = WealthData.getSecurity(holding.ticker);
     const fundamentals = WealthData.getFundamentals(holding.ticker);
-    const currentPrice = holding.currentPrice || holding.avgCost; // fall back to cost if never priced
+    const currentPrice = holding.currentPrice || holding.avgCost;
     const currentValue = holding.quantity * currentPrice;
     const investedValue = holding.quantity * holding.avgCost;
     const gainAbs = currentValue - investedValue;
@@ -45,118 +45,294 @@ const PortfolioModule = (function () {
     return { totalValue, totalInvested, totalGain, totalGainPct, bySector, byAssetClass };
   }
 
+  function localISODate(date = new Date()) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  function isValidTransactionDate(value, today = localISODate()) {
+    if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    const [year, month, day] = value.split("-").map(Number);
+    const parsed = new Date(Date.UTC(year, month - 1, day));
+    const validCalendarDate = parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day;
+    return validCalendarDate && value <= today;
+  }
+
+  function validateTransaction(input, holdings, today = localISODate()) {
+    const type = String(input.type || "").toUpperCase();
+    const ticker = String(input.ticker || "").trim().toUpperCase();
+    const quantity = Number(input.quantity);
+    const price = Number(input.price);
+    const hasCurrentPrice = input.currentPrice !== undefined && input.currentPrice !== null && input.currentPrice !== "";
+    const currentPrice = hasCurrentPrice ? Number(input.currentPrice) : null;
+    if (type !== "BUY" && type !== "SELL") return "Transaction type must be BUY or SELL";
+    if (!ticker) return "Ticker is required";
+    if (!Number.isFinite(quantity) || quantity <= 0) return "Quantity must be greater than zero";
+    if (!Number.isFinite(price) || price <= 0) return "Price must be greater than zero";
+    if (hasCurrentPrice && (!Number.isFinite(currentPrice) || currentPrice <= 0)) return "Current price must be greater than zero when provided";
+    if (!isValidTransactionDate(input.transactionDate, today)) return "Transaction date is required, valid, and cannot be in the future";
+    if (type === "SELL") {
+      const available = holdings
+        .filter(h => h.active !== false && String(h.ticker).toUpperCase() === ticker)
+        .reduce((sum, h) => sum + Number(h.quantity || 0), 0);
+      if (available <= 0) return `No holding is available to sell for ${ticker}`;
+      if (quantity > available) return `Sell quantity exceeds the available ${available}`;
+    }
+    return null;
+  }
+
+  function createTransactionPlan(holdings, input, options = {}) {
+    const today = options.today || localISODate();
+    const error = validateTransaction(input, holdings, today);
+    if (error) return { ok: false, error };
+
+    const type = String(input.type).toUpperCase();
+    const ticker = String(input.ticker).trim().toUpperCase();
+    const quantity = Number(input.quantity);
+    const price = Number(input.price);
+    const suppliedCurrentPrice = input.currentPrice !== undefined && input.currentPrice !== null && input.currentPrice !== "" ? Number(input.currentPrice) : null;
+    const matches = holdings.filter(h => h.active !== false && String(h.ticker).toUpperCase() === ticker);
+    const unaffected = holdings.filter(h => h.active === false || String(h.ticker).toUpperCase() !== ticker);
+    const existingQuantity = matches.reduce((sum, h) => sum + Number(h.quantity || 0), 0);
+    const existingCost = matches.reduce((sum, h) => sum + Number(h.quantity || 0) * Number(h.avgCost || 0), 0);
+    const existingValue = matches.reduce((sum, h) => {
+      const currentPrice = h.currentPrice || h.avgCost;
+      return sum + Number(h.quantity || 0) * Number(currentPrice || 0);
+    }, 0);
+    const existingAverageCost = existingQuantity ? existingCost / existingQuantity : 0;
+    const existingCurrentPrice = existingQuantity ? existingValue / existingQuantity : 0;
+    const baseHolding = matches[0] || null;
+    let nextHolding = null;
+    let realisedGain = null;
+
+    if (type === "BUY") {
+      const nextQuantity = existingQuantity + quantity;
+      nextHolding = {
+        id: baseHolding ? baseHolding.id : (options.holdingId !== undefined ? options.holdingId : Date.now() + Math.random()),
+        ticker,
+        quantity: nextQuantity,
+        avgCost: (existingCost + quantity * price) / nextQuantity,
+        currentPrice: suppliedCurrentPrice !== null ? suppliedCurrentPrice : (existingQuantity ? existingCurrentPrice : null),
+        assetClass: baseHolding ? (baseHolding.assetClass || input.assetClass || "Equity") : (input.assetClass || "Equity")
+      };
+    } else {
+      const nextQuantity = existingQuantity - quantity;
+      realisedGain = (price - existingAverageCost) * quantity;
+      if (nextQuantity > 0) {
+        nextHolding = {
+          id: baseHolding.id,
+          ticker,
+          quantity: nextQuantity,
+          avgCost: existingAverageCost,
+          currentPrice: existingCurrentPrice || existingAverageCost,
+          assetClass: baseHolding.assetClass || "Equity"
+        };
+      }
+    }
+
+    const transaction = {
+      id: options.transactionId !== undefined ? options.transactionId : Date.now() + Math.random(),
+      ticker,
+      type,
+      quantity,
+      price,
+      transactionDate: input.transactionDate,
+      costBasisPerUnit: type === "SELL" ? existingAverageCost : null,
+      realisedGain,
+      createdAt: options.createdAt || new Date().toISOString()
+    };
+
+    return {
+      ok: true,
+      holdings: nextHolding ? [...unaffected, nextHolding] : unaffected,
+      transaction,
+      holding: nextHolding
+    };
+  }
+
+  function computeRealisedGain(transactions) {
+    return transactions.reduce((sum, transaction) => {
+      return transaction.type === "SELL" && typeof transaction.realisedGain === "number" && Number.isFinite(transaction.realisedGain)
+        ? sum + transaction.realisedGain : sum;
+    }, 0);
+  }
+
+  function formatTransactionDate(value) {
+    if (!value || !isValidTransactionDate(value, "9999-12-31")) return "Date unavailable";
+    const [year, month, day] = value.split("-").map(Number);
+    return new Date(year, month - 1, day).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  }
+
+  function fmtINR(value) {
+    if (typeof value !== "number" || !Number.isFinite(value)) return "—";
+    const negative = value < 0;
+    const amount = Math.abs(Math.round(value)).toLocaleString("en-IN");
+    return (negative ? "−₹" : "₹") + amount;
+  }
+
   function render(container) {
+    const today = localISODate();
     container.innerHTML = `
       <div class="module-header">
         <h2>Portfolio</h2>
-        <p class="module-sub">What you actually own — value, gain/loss, and allocation. Works for any ticker; fundamentals context appears automatically for the companies you have real data on.</p>
+        <p class="module-sub">Current holdings plus a manual BUY/SELL ledger. Transactions update weighted-average cost; sales preserve realised gain history.</p>
       </div>
 
       <div id="pf-summary"></div>
 
-      <div class="panel" style="margin: 20px 0;">
-        <div class="field-row"><label for="pf-ticker">Ticker</label><input type="text" id="pf-ticker" style="text-transform:uppercase" placeholder="e.g. TCS"></div>
-        <div class="field-row"><label for="pf-qty">Quantity</label><input type="number" id="pf-qty" placeholder="e.g. 50"></div>
-        <div class="field-row"><label for="pf-cost">Average cost (₹)</label><input type="number" id="pf-cost" placeholder="e.g. 3850"></div>
-        <div class="field-row"><label for="pf-price">Current price (₹, optional)</label><input type="number" id="pf-price" placeholder="defaults to avg cost if left blank"></div>
-        <div class="field-row"><label for="pf-class">Asset class</label>
-          <select id="pf-class" style="min-height:44px;background:var(--bg-ticket);border:1px solid var(--rule-bright);color:var(--paper);font-family:var(--mono);padding:0 10px;width:100%;">
-            ${ASSET_CLASSES.map(c => `<option value="${c}">${c}</option>`).join("")}
+      <div class="panel" id="pf-transaction-panel" style="margin:20px 0;">
+        <div class="section-head" style="margin-bottom:14px;"><span class="section-title" style="font-size:15px;">Record transaction</span></div>
+        <div class="field-row"><label for="pf-tx-type">Type</label>
+          <select id="pf-tx-type" style="min-height:44px;background:var(--bg-ticket);border:1px solid var(--rule-bright);color:var(--paper);font-family:var(--mono);padding:0 10px;width:100%;">
+            <option value="BUY">BUY</option><option value="SELL">SELL</option>
           </select>
         </div>
-        <button class="btn" id="pf-add">Add holding</button>
+        <div class="field-row"><label for="pf-tx-ticker">Ticker</label><input type="text" id="pf-tx-ticker" style="text-transform:uppercase" placeholder="e.g. TCS"></div>
+        <div class="field-row"><label for="pf-tx-qty">Quantity</label><input type="number" id="pf-tx-qty" min="0" step="any"></div>
+        <div class="field-row"><label for="pf-tx-price">Transaction price (₹)</label><input type="number" id="pf-tx-price" min="0" step="any"></div>
+        <div class="field-row" id="pf-tx-current-row"><label for="pf-tx-current-price">Current price (₹, optional)</label><input type="number" id="pf-tx-current-price" min="0" step="any" placeholder="for unrealised gain/loss"></div>
+        <div class="field-row"><label for="pf-tx-date">Transaction date</label><input type="date" id="pf-tx-date" max="${today}" required></div>
+        <div class="field-row" id="pf-tx-asset-row"><label for="pf-tx-class">Asset class</label>
+          <select id="pf-tx-class" style="min-height:44px;background:var(--bg-ticket);border:1px solid var(--rule-bright);color:var(--paper);font-family:var(--mono);padding:0 10px;width:100%;">
+            ${ASSET_CLASSES.map(value => `<option value="${value}">${value}</option>`).join("")}
+          </select>
+        </div>
+        <button class="btn" id="pf-record-transaction">Record BUY</button>
+        <div class="module-sub" style="margin-top:10px;">Manual BUY and SELL entries require their actual transaction date. Imported legacy records without dates remain valid.</div>
       </div>
 
       <div class="section-head"><span class="section-title" style="font-size:15px;">Holdings</span><span class="module-sub" id="pf-count" style="margin-left:auto;"></span></div>
-
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Ticker</th><th>Qty</th><th>Avg Cost</th><th>Current</th><th>Value</th><th>Gain</th><th>Sector</th><th></th></tr></thead>
+          <thead><tr><th>Ticker</th><th>Qty</th><th>Avg Cost</th><th>Current</th><th>Value</th><th>Unrealised</th><th>Sector</th><th>Actions</th></tr></thead>
           <tbody id="pf-table-body"></tbody>
         </table>
       </div>
       <div class="card-list" id="pf-card-list"></div>
+
+      <div class="section-head" style="margin-top:24px;"><span class="section-title" style="font-size:15px;">Transaction history</span><span class="module-sub" id="pf-tx-count" style="margin-left:auto;"></span></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Date</th><th>Type</th><th>Ticker</th><th>Qty</th><th>Price</th><th>Value</th><th>Realised gain/loss</th></tr></thead>
+          <tbody id="pf-tx-table-body"></tbody>
+        </table>
+      </div>
+      <div class="card-list" id="pf-tx-card-list"></div>
     `;
 
-    container.querySelector("#pf-add").addEventListener("click", () => {
-      const ticker = container.querySelector("#pf-ticker").value.trim().toUpperCase();
-      const quantity = parseFloat(container.querySelector("#pf-qty").value);
-      const avgCost = parseFloat(container.querySelector("#pf-cost").value);
-      if (!ticker || !quantity || !avgCost) {
-        App.showStatus("Ticker, quantity, and average cost are required", "error");
+    const typeSelect = container.querySelector("#pf-tx-type");
+    function refreshTransactionForm() {
+      const isSell = typeSelect.value === "SELL";
+      container.querySelector("#pf-tx-asset-row").style.display = isSell ? "none" : "flex";
+      container.querySelector("#pf-tx-current-row").style.display = isSell ? "none" : "flex";
+      container.querySelector("#pf-record-transaction").textContent = `Record ${typeSelect.value}`;
+    }
+    typeSelect.addEventListener("change", refreshTransactionForm);
+    refreshTransactionForm();
+
+    container.querySelector("#pf-record-transaction").addEventListener("click", async () => {
+      const input = {
+        type: typeSelect.value,
+        ticker: container.querySelector("#pf-tx-ticker").value,
+        quantity: container.querySelector("#pf-tx-qty").value,
+        price: container.querySelector("#pf-tx-price").value,
+        currentPrice: container.querySelector("#pf-tx-current-price").value,
+        transactionDate: container.querySelector("#pf-tx-date").value,
+        assetClass: container.querySelector("#pf-tx-class").value
+      };
+      const plan = createTransactionPlan(WealthData.getHoldings(), input);
+      if (!plan.ok) {
+        App.showStatus(plan.error, "error");
         return;
       }
-      const currentPriceInput = parseFloat(container.querySelector("#pf-price").value);
-      WealthData.addHolding({
-        ticker, quantity, avgCost,
-        currentPrice: isNaN(currentPriceInput) ? null : currentPriceInput,
-        assetClass: container.querySelector("#pf-class").value
-      });
-      ["pf-ticker","pf-qty","pf-cost","pf-price"].forEach(id => container.querySelector("#"+id).value = "");
-      App.saveNow(true);
-      renderList(container);
+      WealthData.commitPortfolioTransaction(plan.holdings, plan.transaction);
+      ["pf-tx-ticker", "pf-tx-qty", "pf-tx-price", "pf-tx-current-price", "pf-tx-date"].forEach(id => { container.querySelector("#" + id).value = ""; });
+      await App.saveNow(true);
+      renderLists(container);
     });
 
-    renderList(container);
+    renderLists(container);
   }
 
-  function fmtINR(n) {
-    const neg = n < 0; n = Math.abs(Math.round(n));
-    return (neg ? "−₹" : "₹") + n.toLocaleString("en-IN");
-  }
-
-  function renderList(container) {
+  function renderLists(container) {
     const holdings = WealthData.getHoldings().filter(h => h.active !== false);
     const rows = holdings.map(computeRow);
     const summary = computeSummary(rows);
+    const transactions = WealthData.getPortfolioTransactions();
+    const realisedGain = computeRealisedGain(transactions);
 
     container.querySelector("#pf-summary").innerHTML = `
       <div class="ratio-grid">
         <div class="ratio-cell"><div class="ratio-label">Total Value</div><div class="ratio-value">${fmtINR(summary.totalValue)}</div></div>
         <div class="ratio-cell"><div class="ratio-label">Invested</div><div class="ratio-value">${fmtINR(summary.totalInvested)}</div></div>
-        <div class="ratio-cell"><div class="ratio-label">Gain/Loss</div><div class="ratio-value" style="color:${summary.totalGain>=0?'var(--gain)':'var(--loss)'}">${fmtINR(summary.totalGain)}</div></div>
-        <div class="ratio-cell"><div class="ratio-label">Return</div><div class="ratio-value" style="color:${summary.totalGainPct>=0?'var(--gain)':'var(--loss)'}">${summary.totalGainPct>=0?'+':''}${summary.totalGainPct.toFixed(1)}%</div></div>
+        <div class="ratio-cell"><div class="ratio-label">Unrealised Gain/Loss</div><div class="ratio-value" style="color:${summary.totalGain >= 0 ? 'var(--gain)' : 'var(--loss)'}">${fmtINR(summary.totalGain)}</div></div>
+        <div class="ratio-cell"><div class="ratio-label">Realised Gain/Loss</div><div class="ratio-value" style="color:${realisedGain >= 0 ? 'var(--gain)' : 'var(--loss)'}">${fmtINR(realisedGain)}</div></div>
       </div>
     `;
 
     container.querySelector("#pf-count").textContent = `${rows.length} ${rows.length === 1 ? "holding" : "holdings"}`;
-
-    container.querySelector("#pf-table-body").innerHTML = rows.length ? rows.map(r => `
+    container.querySelector("#pf-table-body").innerHTML = rows.length ? rows.map(row => `
       <tr>
-        <td>${r.holding.ticker}${r.hasFundamentals ? '' : ''}</td>
-        <td>${r.holding.quantity}</td>
-        <td>₹${r.holding.avgCost.toLocaleString('en-IN')}</td>
-        <td>₹${r.currentPrice.toLocaleString('en-IN')}</td>
-        <td>${fmtINR(r.currentValue)}</td>
-        <td style="color:${r.gainPct>=0?'var(--gain)':'var(--loss)'}">${r.gainPct>=0?'+':''}${r.gainPct.toFixed(1)}%</td>
-        <td>${r.sector || '—'}</td>
-        <td><button class="ticker-chip" data-remove="${r.holding.id}" style="min-height:32px;padding:0 10px;">Remove</button></td>
+        <td>${row.holding.ticker}</td><td>${row.holding.quantity}</td>
+        <td>₹${row.holding.avgCost.toLocaleString("en-IN")}</td><td>₹${row.currentPrice.toLocaleString("en-IN")}</td>
+        <td>${fmtINR(row.currentValue)}</td>
+        <td style="color:${row.gainPct >= 0 ? 'var(--gain)' : 'var(--loss)'}">${row.gainPct >= 0 ? '+' : ''}${row.gainPct.toFixed(1)}%</td>
+        <td>${row.sector || '—'}</td>
+        <td><div class="holding-actions"><button class="btn holding-sell" data-sell="${row.holding.id}">Sell</button><button class="ticker-chip holding-delete" data-delete-holding="${row.holding.id}">Delete holding</button></div></td>
       </tr>
     `).join("") : `<tr><td colspan="8" style="text-align:center;color:var(--paper-faint);font-style:italic;">No holdings yet.</td></tr>`;
 
-    container.querySelector("#pf-card-list").innerHTML = rows.length ? rows.map(r => `
+    container.querySelector("#pf-card-list").innerHTML = rows.length ? rows.map(row => `
       <div class="data-card">
-        <div class="data-card-title" style="display:flex;justify-content:space-between;align-items:center;">
-          ${r.holding.ticker}
-          <span class="chip ${r.gainPct>=0?'gain':'loss'}" style="font-family:var(--mono);font-size:11px;padding:3px 8px;border:1px solid var(--rule-bright);">${r.gainPct>=0?'+':''}${r.gainPct.toFixed(1)}%</span>
-        </div>
-        <div class="data-card-row"><span class="k">Qty</span><span class="v">${r.holding.quantity}</span></div>
-        <div class="data-card-row"><span class="k">Avg Cost</span><span class="v">₹${r.holding.avgCost.toLocaleString('en-IN')}</span></div>
-        <div class="data-card-row"><span class="k">Current</span><span class="v">₹${r.currentPrice.toLocaleString('en-IN')}</span></div>
-        <div class="data-card-row"><span class="k">Value</span><span class="v">${fmtINR(r.currentValue)}</span></div>
-        ${r.sector ? `<div class="data-card-row"><span class="k">Sector</span><span class="v">${r.sector}</span></div>` : ""}
-        <button class="btn" data-remove="${r.holding.id}" style="margin-top:10px;background:transparent;border:1px solid var(--rule-bright);color:var(--paper-dim);">Remove</button>
+        <div class="data-card-title" style="display:flex;justify-content:space-between;align-items:center;">${row.holding.ticker}<span class="chip ${row.gainPct >= 0 ? 'gain' : 'loss'}" style="font-family:var(--mono);font-size:11px;padding:3px 8px;border:1px solid var(--rule-bright);">${row.gainPct >= 0 ? '+' : ''}${row.gainPct.toFixed(1)}%</span></div>
+        <div class="data-card-row"><span class="k">Qty</span><span class="v">${row.holding.quantity}</span></div>
+        <div class="data-card-row"><span class="k">Average cost</span><span class="v">₹${row.holding.avgCost.toLocaleString("en-IN")}</span></div>
+        <div class="data-card-row"><span class="k">Current value</span><span class="v">${fmtINR(row.currentValue)}</span></div>
+        <button class="btn holding-sell" data-sell="${row.holding.id}" style="margin-top:10px;">Sell</button>
+        <button class="btn holding-delete" data-delete-holding="${row.holding.id}" style="margin-top:8px;background:transparent;border:1px solid var(--rule-bright);color:var(--paper-dim);">Delete holding</button>
       </div>
-    `).join("") : `<div class="module-sub" style="font-style:italic;padding:20px 0;text-align:center;">No holdings yet. Add your first one above.</div>`;
+    `).join("") : `<div class="module-sub" style="font-style:italic;padding:20px 0;text-align:center;">No holdings yet. Record a BUY transaction above to create one.</div>`;
 
-    container.querySelectorAll("[data-remove]").forEach(btn => {
-      btn.addEventListener("click", () => {
-        WealthData.removeHolding(parseFloat(btn.dataset.remove));
-        App.saveNow(true);
-        renderList(container);
+    container.querySelectorAll("[data-sell]").forEach(button => {
+      button.addEventListener("click", () => {
+        const holding = holdings.find(item => item.id === Number(button.dataset.sell));
+        if (!holding) return;
+        container.querySelector("#pf-tx-type").value = "SELL";
+        container.querySelector("#pf-tx-type").dispatchEvent(new Event("change"));
+        container.querySelector("#pf-tx-ticker").value = holding.ticker;
+        container.querySelector("#pf-tx-qty").focus();
+        container.querySelector("#pf-transaction-panel").scrollIntoView({ behavior: "smooth", block: "start" });
       });
     });
+    container.querySelectorAll("[data-delete-holding]").forEach(button => {
+      button.addEventListener("click", async () => {
+        if (!confirm("Permanently delete this holding as a data correction? This is not a sale and creates no SELL transaction.")) return;
+        WealthData.removeHolding(Number(button.dataset.deleteHolding));
+        await App.saveNow(true);
+        renderLists(container);
+      });
+    });
+
+    const sortedTransactions = transactions.slice().sort((a, b) => {
+      const aDate = a.transactionDate || "";
+      const bDate = b.transactionDate || "";
+      if (aDate !== bDate) return bDate.localeCompare(aDate);
+      return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+    });
+    container.querySelector("#pf-tx-count").textContent = `${sortedTransactions.length} ${sortedTransactions.length === 1 ? "transaction" : "transactions"}`;
+    container.querySelector("#pf-tx-table-body").innerHTML = sortedTransactions.length ? sortedTransactions.map(transaction => `
+      <tr><td>${formatTransactionDate(transaction.transactionDate)}</td><td>${transaction.type || '—'}</td><td>${transaction.ticker || '—'}</td><td>${transaction.quantity ?? '—'}</td><td>${fmtINR(transaction.price)}</td><td>${fmtINR(Number(transaction.quantity) * Number(transaction.price))}</td><td>${transaction.type === 'SELL' ? fmtINR(transaction.realisedGain) : '—'}</td></tr>
+    `).join("") : `<tr><td colspan="7" style="text-align:center;color:var(--paper-faint);font-style:italic;">No transactions recorded yet.</td></tr>`;
+    container.querySelector("#pf-tx-card-list").innerHTML = sortedTransactions.length ? sortedTransactions.map(transaction => `
+      <div class="data-card"><div class="data-card-title">${transaction.type || '—'} · ${transaction.ticker || '—'}</div><div class="data-card-row"><span class="k">Date</span><span class="v">${formatTransactionDate(transaction.transactionDate)}</span></div><div class="data-card-row"><span class="k">Quantity</span><span class="v">${transaction.quantity ?? '—'}</span></div><div class="data-card-row"><span class="k">Price</span><span class="v">${fmtINR(transaction.price)}</span></div>${transaction.type === 'SELL' ? `<div class="data-card-row"><span class="k">Realised gain/loss</span><span class="v">${fmtINR(transaction.realisedGain)}</span></div>` : ''}</div>
+    `).join("") : `<div class="module-sub" style="font-style:italic;padding:20px 0;text-align:center;">No transactions recorded yet. Legacy holdings remain valid without fabricated history.</div>`;
   }
 
-  return { render, computeRow, computeSummary };
+  return {
+    render, computeRow, computeSummary, computeRealisedGain,
+    isValidTransactionDate, validateTransaction, createTransactionPlan,
+    formatTransactionDate, localISODate
+  };
 })();

@@ -4,16 +4,16 @@ Standing invariants for this module. Re-run this checklist after any future chan
 
 ## Data Invariants
 
-- [ ] **Every holding has a `ticker`, `quantity`, and `avgCost`.** Enforced at entry (`render()`'s add-handler rejects if any is missing), but **not enforced at the data-model layer** — `WealthData.addHolding()` itself performs no validation. A holding could be added programmatically (e.g., via a future Import feature) without these fields, and `computeRow()` would likely throw rather than fail gracefully. **Status: gap, not yet a defect** — no current code path creates this state, but nothing prevents a future one from doing so.
-- [ ] **`quantity` and `avgCost` are non-negative.** **Not currently enforced anywhere.** See PORT-P01 in the Verification Report.
+- [ ] **Every holding has a `ticker`, `quantity`, and `avgCost`.** Enforced for manual BUY/SELL entry by the v1.1 ledger validator, but **not enforced for imported/programmatic legacy data**. `WealthData.addHolding()` remains intentionally permissive for backward compatibility.
+- [x] **Manual transaction quantity and price are positive.** Enforced before a transaction plan can be committed; overselling is also rejected without mutation.
+- [x] **Manual transaction date is present, calendar-valid, and non-future.** Imported or legacy records may omit it and display `Date unavailable`; no date is fabricated.
 - [x] **Legacy `active` values remain backward compatible.** New holdings omit the optional field. Both Portfolio and Intraday use `h.active !== false`, so missing and `true` remain included while an imported legacy `active: false` holding remains excluded.
 - [x] **Sum of per-sector values equals total portfolio value.** Verified numerically in the regression suite (TC-Summary-01) — not just assumed from the grouping logic.
 - [x] **Sum of per-asset-class values equals total portfolio value.** Same verification as above.
 
 ## Validation Checks Not Yet Implemented (documented as gaps, not silently assumed absent)
 
-- No check preventing duplicate ticker entries as separate holdings (Observation, see Verification Report).
-- No check on `purchaseDate` being a real, non-future date.
+- Legacy backups may contain duplicate ticker holdings. The first manual v1.1 transaction for that ticker consolidates included lots using weighted-average cost while leaving `active:false` records untouched.
 - No check on `currentPrice` being a plausible value (e.g., not negative) — a negative `currentPrice` would silently produce a negative `currentValue` with no warning.
 - No cross-check against `WealthData.securities` to confirm a ticker is a recognized/valid symbol — by design, per the Standalone Value Rule (this is correct behavior, not a gap).
 

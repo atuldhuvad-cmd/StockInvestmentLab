@@ -55,6 +55,7 @@ const OverviewModule = (function () {
 
     const includedHoldings = WealthData.getHoldings().filter(h => h.active !== false);
     const portfolioSummary = PortfolioModule.computeSummary(includedHoldings.map(PortfolioModule.computeRow));
+    const realisedGain = PortfolioModule.computeRealisedGain(WealthData.getPortfolioTransactions());
 
     const watchlistCounts = {};
     WealthData.getWatchlist().forEach(item => {
@@ -94,7 +95,7 @@ const OverviewModule = (function () {
     const allocation = IntradayModule.computeAllocation();
 
     return {
-      portfolio: { count: includedHoldings.length, ...portfolioSummary },
+      portfolio: { count: includedHoldings.length, realisedGain, ...portfolioSummary },
       watchlist: { total: WealthData.getWatchlist().length, counts: watchlistCounts },
       delivery: { available: deliveryCandidates.length, top: deliveryCandidates.slice(0, 3) },
       research: { ...researchSummary, latest: latestResearch },
@@ -129,7 +130,8 @@ const OverviewModule = (function () {
       ? `<div class="ratio-grid overview-ratios">
           ${metric("Portfolio value", fmtINR(model.portfolio.totalValue))}
           ${metric("Invested", fmtINR(model.portfolio.totalInvested))}
-          ${metric("Gain/Loss", fmtINR(model.portfolio.totalGain), gainClass)}
+          ${metric("Unrealised gain/loss", fmtINR(model.portfolio.totalGain), gainClass)}
+          ${metric("Realised gain/loss", fmtINR(model.portfolio.realisedGain), model.portfolio.realisedGain < 0 ? "overview-loss" : "overview-gain")}
           ${metric("Included holdings", String(model.portfolio.count))}
         </div>`
       : `<p class="overview-empty">No holdings yet. Add holdings in Portfolio to see value and gain/loss here.</p>`;
