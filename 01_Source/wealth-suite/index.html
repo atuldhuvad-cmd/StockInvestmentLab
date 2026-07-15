@@ -45,13 +45,12 @@
 <script src="js/modules/watchlist.js"></script>
 <script src="js/modules/portfolio.js"></script>
 <script src="js/modules/delivery-screener.js"></script>
-<script src="js/modules/macro.js"></script>
 
 <!-- Shell (must load after modules, before the registration script below) -->
 <script src="js/app.js"></script>
 
 <script>
-  // Module registration — the only place that knows about all six active modules.
+  // Module registration — the only place that knows about all five active modules.
   // Adding a module later means one line here, nothing else in this file
   // changes.
   App.registerModule("overview", "Overview", OverviewModule.render, "ready");
@@ -59,7 +58,6 @@
   App.registerModule("watchlist", "Watchlist", WatchlistModule.render, "ready");
   App.registerModule("delivery", "Delivery", DeliveryScreenerModule.render, "ready");
   App.registerModule("fundamentals", "Fundamentals", FundamentalsModule.render, "ready");
-  App.registerModule("macro", "Macro", MacroModule.render, "ready");
 
   App.init();
 </script>

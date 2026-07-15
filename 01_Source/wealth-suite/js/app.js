@@ -54,9 +54,14 @@ const App = (function () {
     await Persistence.load(); // silent — first run just uses the empty default state
 
     document.getElementById("btn-save").addEventListener("click", () => saveNow(true));
-    document.getElementById("btn-export").addEventListener("click", () => {
-      Persistence.exportToFile();
-      showStatus("Backup file downloaded", "ok");
+    document.getElementById("btn-export").addEventListener("click", async () => {
+      try {
+        await Persistence.exportToFile();
+        showStatus("Backup file downloaded", "ok");
+        switchTo(activeKey);
+      } catch (err) {
+        showStatus("Backup export failed: " + err.message, "error");
+      }
     });
     document.getElementById("btn-import").addEventListener("click", () => {
       document.getElementById("import-file-input").click();

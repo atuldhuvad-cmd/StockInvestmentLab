@@ -1,4 +1,4 @@
-PERSONAL DELIVERY INVESTMENT AND PORTFOLIO MANAGEMENT PLATFORM v1.4
+PERSONAL DELIVERY INVESTMENT AND PORTFOLIO MANAGEMENT PLATFORM v1.5
 ============================================================
 
 OPEN THE APPLICATION
@@ -12,19 +12,21 @@ RECOMMENDED DAILY WORKFLOW
 3. Review Watchlist and Delivery candidates.
    In Delivery, import an offline OHLCV CSV when you want Technical Trend.
 4. Review company history and ratios in Fundamentals.
-5. Use Macro for factual market context when a new JSON snapshot is available.
-6. Click Save, then export a backup regularly.
+5. Click Save, then export a backup regularly.
 
 CORE WORKFLOW
-Overview -> Portfolio -> Watchlist -> Delivery Screener -> Fundamentals -> Macro Context
+Overview -> Portfolio -> Watchlist -> Delivery Screener -> Fundamentals
 
-ACTIVE MODULES (6)
+ACTIVE MODULES (5)
 Overview      Read-only daily summary of existing suite data.
 Portfolio     Holdings, BUY/SELL ledger, weighted cost, and realised/unrealised gain.
 Watchlist     Companies to watch, study, buy soon, or reject.
 Delivery      Existing ranked decision-support scores and ratings.
 Fundamentals  Financial history, ratios, quality context, and red flags.
-Macro         Factual imported Indian macro readings.
+
+MACRO COMPATIBILITY
+Legacy Macro data remains preserved in backups but is no longer part of the
+active workflow. Its source and regression history remain in the repository.
 
 RESEARCH LIBRARY COMPATIBILITY
 Legacy Research Library data remains preserved in backups but is no longer part
@@ -41,8 +43,9 @@ open it. Data is not uploaded by the application. Different browsers or
 browser profiles have separate storage.
 
 To back up: click Export backup and keep the downloaded JSON file somewhere
-safe. Export before clearing browser data, resetting the browser profile,
-moving computers, or reinstalling the browser.
+safe. Overview then shows the backup date and whether it is Current (up to 7
+days old) or Due. Export before clearing browser data, resetting the browser
+profile, moving computers, or reinstalling the browser.
 
 To restore: click Import backup, select a previously exported JSON file, and
 confirm the replacement. Import replaces the suite's current browser data,

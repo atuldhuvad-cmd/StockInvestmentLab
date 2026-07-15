@@ -8,14 +8,18 @@ A verified **Personal Delivery Investment and Portfolio Management Platform**
 (`01_Source\wealth-suite`), built in pure HTML/CSS/JS with IndexedDB persistence,
 alongside formal, evidence-based verification history.
 
-## Active application (wealth-suite-v1.4)
+## Active application (wealth-suite-v1.5)
 
-The focused platform has six active navigation modules, in this order:
-Overview, Portfolio, Watchlist, Delivery, Fundamentals, and Macro. Overview
-opens by default.
+The focused platform has five active navigation modules, in this order:
+Overview, Portfolio, Watchlist, Delivery, and Fundamentals. Overview opens by
+default.
 
 Core workflow: Overview → Portfolio → Watchlist → Delivery Screener →
-Fundamentals → Macro Context.
+Fundamentals.
+
+Legacy Macro data remains preserved in backups but is no longer part of the
+active workflow. Macro source and regressions remain in the repository for
+compatibility and historical reference.
 
 Legacy Research Library data remains preserved in backups but is no longer part
 of the active workflow. Its source, state fields, verification evidence, and
@@ -36,7 +40,7 @@ verified; neither module is loaded or registered in the active application.
 | Delivery Screener | Frozen | v1.0 |
 | Intraday | Frozen; inactive in Wealth Suite UI | v1.0 |
 | Research | Frozen; inactive in Wealth Suite UI | v1.0 |
-| Macro | Pending | v0.0 |
+| Macro | Inactive in Wealth Suite UI; legacy data preserved | v0.0 |
 | Watchlist | Pending | v0.0 |
 | Persistence | Pending | v0.0 |
 | Settings | Inactive in Wealth Suite UI | v0.0 |

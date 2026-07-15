@@ -79,18 +79,30 @@ const Persistence = (function () {
     }
   }
 
-  function exportToFile() {
+  async function exportToFile() {
     const state = WealthData.get();
-    const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+    const backupTimestamp = new Date().toISOString();
+    const exportState = {
+      ...state,
+      meta: { ...(state.meta || {}), lastBackupAt: backupTimestamp }
+    };
+    const blob = new Blob([JSON.stringify(exportState, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    const dateStr = new Date().toISOString().slice(0, 10);
+    const dateStr = backupTimestamp.slice(0, 10);
     a.href = url;
     a.download = `wealth-intelligence-backup-${dateStr}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    try {
+      document.body.appendChild(a);
+      a.click();
+      state.meta = { ...(state.meta || {}), lastBackupAt: backupTimestamp };
+      const saved = await save();
+      if (!saved) throw new Error("Backup downloaded, but its timestamp could not be saved locally.");
+      return backupTimestamp;
+    } finally {
+      if (a.parentNode) a.parentNode.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
   }
 
   function importFromFile(file) {

@@ -8,16 +8,6 @@
 
 const OverviewModule = (function () {
 
-  const MACRO_PRESENTATION = {
-    repoRate: { label: "RBI Repo Rate", suffix: "%" },
-    cpiInflation: { label: "CPI Inflation", suffix: "%" },
-    usdinr: { label: "USD/INR", suffix: "" },
-    crudeOil: { label: "Crude Oil", prefix: "$", suffix: "" },
-    bondYield10Y: { label: "10Y Bond Yield", suffix: "%" },
-    fiiNet: { label: "FII Net Flow", suffix: " Cr" },
-    diiNet: { label: "DII Net Flow", suffix: " Cr" }
-  };
-
   function escapeHtml(value) {
     return String(value)
       .replaceAll("&", "&amp;")
@@ -45,9 +35,17 @@ const OverviewModule = (function () {
     return category === "Research" ? "Needs Study" : (category || "Unclassified");
   }
 
-  function latestPoint(series) {
-    if (!Array.isArray(series) || !series.length) return null;
-    return series.slice().sort((a, b) => new Date(a.date) - new Date(b.date))[series.length - 1] || null;
+  function latestValidDate(values) {
+    const timestamps = values.map(value => new Date(value).getTime()).filter(Number.isFinite);
+    return timestamps.length ? new Date(Math.max(...timestamps)).toISOString() : null;
+  }
+
+  function getBackupStatus(lastBackupAt, now = new Date()) {
+    if (!lastBackupAt) return "Never created";
+    const backupTime = new Date(lastBackupAt).getTime();
+    const nowTime = new Date(now).getTime();
+    if (!Number.isFinite(backupTime) || !Number.isFinite(nowTime)) return "Never created";
+    return nowTime - backupTime <= 7 * 24 * 60 * 60 * 1000 ? "Current" : "Due";
   }
 
   function buildViewModel() {
@@ -73,23 +71,31 @@ const OverviewModule = (function () {
       .filter(Number.isFinite);
     const latestFiscalYear = fiscalYears.length ? Math.max(...fiscalYears) : null;
 
-    const macroReadings = Object.entries(MACRO_PRESENTATION).map(([key, presentation]) => {
-      const point = latestPoint((state.macroIndicators || {})[key]);
-      return point ? { key, ...presentation, point } : null;
-    }).filter(Boolean);
-    const macroDates = macroReadings.map(item => new Date(item.point.date).getTime()).filter(Number.isFinite);
-    const latestMacroDate = macroDates.length ? new Date(Math.max(...macroDates)).toISOString() : null;
+    const transactions = WealthData.getPortfolioTransactions();
+    const portfolioLastUpdated = latestValidDate(transactions.map(item => item.createdAt));
+    const latestTransactionDate = latestValidDate(transactions.map(item => item.transactionDate));
+    const priceRecords = Object.values(state.priceHistory || {});
+    const latestPriceHistoryDate = latestValidDate(priceRecords.flatMap(record =>
+      Array.isArray(record && record.rows) ? record.rows.map(row => row.date) : []
+    ));
+    const completeTechnicalCount = deliveryCandidates.filter(item => item.technical && item.technical.available).length;
+    const waitingTechnicalCount = Math.max(0, deliveryCandidates.length - completeTechnicalCount);
+    const lastBackupAt = state.meta && state.meta.lastBackupAt ? state.meta.lastBackupAt : null;
 
     return {
       portfolio: { count: includedHoldings.length, realisedGain, ...portfolioSummary },
       watchlist: { total: WealthData.getWatchlist().length, counts: watchlistCounts },
       delivery: { available: deliveryCandidates.length, top: deliveryCandidates.slice(0, 3) },
       fundamentals: { companyCount: fundamentals.length, latestFiscalYear },
-      macro: { latestDate: latestMacroDate, readings: macroReadings },
-      dataStatus: {
-        indexedDB: "Loaded",
-        schemaVersion: state.meta && state.meta.schemaVersion !== undefined ? state.meta.schemaVersion : null,
-        lastBackupAt: state.meta && state.meta.lastBackupAt ? state.meta.lastBackupAt : null
+      dataHealth: {
+        portfolioLastUpdated,
+        latestTransactionDate,
+        latestPriceHistoryDate,
+        completeTechnicalCount,
+        waitingTechnicalCount,
+        latestFiscalYear,
+        lastBackupAt,
+        backupStatus: getBackupStatus(lastBackupAt)
       }
     };
   }
@@ -114,7 +120,7 @@ const OverviewModule = (function () {
           ${metric("Realised gain/loss", fmtINR(model.portfolio.realisedGain), model.portfolio.realisedGain < 0 ? "overview-loss" : "overview-gain")}
           ${metric("Included holdings", String(model.portfolio.count))}
         </div>`
-      : `<p class="overview-empty">No holdings yet. Add holdings in Portfolio to see value and gain/loss here.</p>`;
+      : `<p class="overview-empty">No portfolio holdings entered.</p>`;
 
     const watchlistCategories = Object.entries(model.watchlist.counts)
       .sort(([a], [b]) => a.localeCompare(b))
@@ -138,24 +144,20 @@ const OverviewModule = (function () {
         </div><p class="overview-note">Financial history is available for ${model.fundamentals.companyCount} ${model.fundamentals.companyCount === 1 ? "company" : "companies"}.</p>`
       : `<p class="overview-empty">No Fundamentals data available.</p>`;
 
-    const macro = model.macro.readings.length
-      ? `<div class="ratio-grid overview-ratios">
-          ${metric("Latest snapshot", fmtDate(model.macro.latestDate))}
-          ${metric("Indicators available", String(model.macro.readings.length))}
-        </div>
-        <div class="overview-list">${model.macro.readings.map(item => {
-          const rawValue = item.point.value;
-          const value = typeof rawValue === "number" && Number.isFinite(rawValue)
-            ? `${item.prefix || ""}${rawValue.toLocaleString("en-IN")}${item.suffix || ""}` : "—";
-          return `<div class="overview-list-row"><span>${escapeHtml(item.label)}</span><strong>${escapeHtml(value)}</strong></div>`;
-        }).join("")}</div>`
-      : `<p class="overview-empty">No Macro snapshots imported yet.</p>`;
-
-    const dataStatus = `<div class="overview-list">
-      <div class="overview-list-row"><span>IndexedDB</span><strong>${escapeHtml(model.dataStatus.indexedDB)}</strong></div>
-      <div class="overview-list-row"><span>Schema version</span><strong>${model.dataStatus.schemaVersion === null ? "—" : escapeHtml(model.dataStatus.schemaVersion)}</strong></div>
-      <div class="overview-list-row"><span>Last backup</span><strong>${model.dataStatus.lastBackupAt ? escapeHtml(fmtDate(model.dataStatus.lastBackupAt)) : "Not recorded"}</strong></div>
+    const dataHealth = `<div class="overview-list">
+      <div class="overview-list-row"><span>Portfolio last updated</span><strong>${model.dataHealth.portfolioLastUpdated ? escapeHtml(fmtDate(model.dataHealth.portfolioLastUpdated)) : "—"}</strong></div>
+      <div class="overview-list-row"><span>Latest portfolio transaction</span><strong>${model.dataHealth.latestTransactionDate ? escapeHtml(fmtDate(model.dataHealth.latestTransactionDate)) : "No portfolio transactions recorded"}</strong></div>
+      <div class="overview-list-row"><span>Latest imported price-history date</span><strong>${model.dataHealth.latestPriceHistoryDate ? escapeHtml(fmtDate(model.dataHealth.latestPriceHistoryDate)) : "—"}</strong></div>
+      <div class="overview-list-row"><span>Complete Technical Trend</span><strong>${model.dataHealth.completeTechnicalCount}</strong></div>
+      <div class="overview-list-row"><span>Waiting for price history</span><strong>${model.dataHealth.waitingTechnicalCount}</strong></div>
+      <div class="overview-list-row"><span>Latest Fundamentals fiscal year</span><strong>${model.dataHealth.latestFiscalYear === null ? "—" : `FY${model.dataHealth.latestFiscalYear}`}</strong></div>
+      <div class="overview-list-row"><span>Last backup</span><strong>${model.dataHealth.lastBackupAt ? escapeHtml(fmtDate(model.dataHealth.lastBackupAt)) : "Never recorded"}</strong></div>
+      <div class="overview-list-row"><span>Backup status</span><strong>${escapeHtml(model.dataHealth.backupStatus)}</strong></div>
     </div>`;
+    const healthNotes = `${model.dataHealth.waitingTechnicalCount
+      ? `<p class="overview-note">Price history required for ${model.dataHealth.waitingTechnicalCount} ${model.dataHealth.waitingTechnicalCount === 1 ? "company" : "companies"}.</p>` : ""}
+      ${model.dataHealth.backupStatus === "Never created"
+        ? '<p class="overview-empty">No backup recorded — export a backup after entering important data.</p>' : ""}`;
 
     container.innerHTML = `
       <div class="module-header">
@@ -167,11 +169,10 @@ const OverviewModule = (function () {
         ${section("Watchlist", watchlist)}
         ${section("Delivery", delivery)}
         ${section("Fundamentals", fundamentals)}
-        ${section("Macro", macro)}
-        ${section("Data status", dataStatus)}
+        ${section("Data & Backup Health", dataHealth + healthNotes)}
       </div>
     `;
   }
 
-  return { render, buildViewModel };
+  return { render, buildViewModel, getBackupStatus };
 })();
