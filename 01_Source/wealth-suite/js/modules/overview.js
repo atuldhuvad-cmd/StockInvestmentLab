@@ -68,18 +68,6 @@ const OverviewModule = (function () {
       .filter(Boolean)
       .sort((a, b) => b.overall - a.overall || a.ticker.localeCompare(b.ticker));
 
-    const researchEntries = WealthData.getResearchLibrary();
-    const researchSummary = ResearchModule.computeSummary(researchEntries);
-    const latestResearch = researchEntries.slice()
-      .sort((a, b) => new Date(b.addedAt) - new Date(a.addedAt))
-      .slice(0, 3)
-      .map(entry => ({
-        ticker: entry.ticker,
-        title: entry.title,
-        type: ResearchModule.getResearchTypeDisplayLabel(entry.docType),
-        addedAt: entry.addedAt
-      }));
-
     const fundamentals = Object.values(state.fundamentals || {});
     const fiscalYears = fundamentals.flatMap(item => Array.isArray(item.years) ? item.years.map(year => Number(year.year)) : [])
       .filter(Number.isFinite);
@@ -96,7 +84,6 @@ const OverviewModule = (function () {
       portfolio: { count: includedHoldings.length, realisedGain, ...portfolioSummary },
       watchlist: { total: WealthData.getWatchlist().length, counts: watchlistCounts },
       delivery: { available: deliveryCandidates.length, top: deliveryCandidates.slice(0, 3) },
-      research: { ...researchSummary, latest: latestResearch },
       fundamentals: { companyCount: fundamentals.length, latestFiscalYear },
       macro: { latestDate: latestMacroDate, readings: macroReadings },
       dataStatus: {
@@ -144,19 +131,6 @@ const OverviewModule = (function () {
          `).join("")}</div>`
       : `<p class="overview-empty">No companies can be ranked yet. Add Fundamentals data first.</p>`;
 
-    const research = model.research.totalEntries
-      ? `<div class="ratio-grid overview-ratios">
-          ${metric("Records", String(model.research.totalEntries))}
-          ${metric("Companies", String(model.research.companyCount))}
-        </div>
-        <div class="overview-list">${model.research.latest.map(item => `
-          <div class="overview-list-row overview-list-row-stacked">
-            <span><strong>${escapeHtml(item.ticker || "—")}</strong> · ${escapeHtml(item.type)}</span>
-            <span>${escapeHtml(item.title || "Untitled")} · ${escapeHtml(fmtDate(item.addedAt))}</span>
-          </div>
-        `).join("")}</div>`
-      : `<p class="overview-empty">No Research records yet.</p>`;
-
     const fundamentals = model.fundamentals.companyCount
       ? `<div class="ratio-grid overview-ratios">
           ${metric("Companies", String(model.fundamentals.companyCount))}
@@ -192,7 +166,6 @@ const OverviewModule = (function () {
         ${section("Portfolio", portfolio)}
         ${section("Watchlist", watchlist)}
         ${section("Delivery", delivery)}
-        ${section("Research", research)}
         ${section("Fundamentals", fundamentals)}
         ${section("Macro", macro)}
         ${section("Data status", dataStatus)}

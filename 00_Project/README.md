@@ -4,13 +4,22 @@
 
 ## What this project is
 
-A verified personal wealth-management application (`01_Source\wealth-suite`), built pure HTML/CSS/JS with IndexedDB persistence, alongside a formal, evidence-based verification methodology applied module by module.
+A verified **Personal Delivery Investment and Portfolio Management Platform**
+(`01_Source\wealth-suite`), built in pure HTML/CSS/JS with IndexedDB persistence,
+alongside formal, evidence-based verification history.
 
-## Active application (wealth-suite-v1.3)
+## Active application (wealth-suite-v1.4)
 
-The Wealth Intelligence Suite has seven active navigation modules, in this
-order: Overview, Portfolio, Watchlist, Delivery, Research, Fundamentals, and
-Macro. Overview opens by default.
+The focused platform has six active navigation modules, in this order:
+Overview, Portfolio, Watchlist, Delivery, Fundamentals, and Macro. Overview
+opens by default.
+
+Core workflow: Overview → Portfolio → Watchlist → Delivery Screener →
+Fundamentals → Macro Context.
+
+Legacy Research Library data remains preserved in backups but is no longer part
+of the active workflow. Its source, state fields, verification evidence, and
+regressions remain in the repository for compatibility and historical reference.
 
 Intraday trading is being developed as a separate satellite project. Existing
 legacy Intraday data remains preserved in backups. Intraday and Settings source,
@@ -26,7 +35,7 @@ verified; neither module is loaded or registered in the active application.
 | Fundamentals | Frozen | v1.0 |
 | Delivery Screener | Frozen | v1.0 |
 | Intraday | Frozen; inactive in Wealth Suite UI | v1.0 |
-| Research | Frozen | v1.0 |
+| Research | Frozen; inactive in Wealth Suite UI | v1.0 |
 | Macro | Pending | v0.0 |
 | Watchlist | Pending | v0.0 |
 | Persistence | Pending | v0.0 |

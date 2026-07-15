@@ -1,4 +1,4 @@
-WEALTH INTELLIGENCE SUITE v1.3 - QUICK GUIDE
+PERSONAL DELIVERY INVESTMENT AND PORTFOLIO MANAGEMENT PLATFORM v1.4
 ============================================================
 
 OPEN THE APPLICATION
@@ -11,18 +11,24 @@ RECOMMENDED DAILY WORKFLOW
 2. Record dated Portfolio BUY and SELL transactions when they occur.
 3. Review Watchlist and Delivery candidates.
    In Delivery, import an offline OHLCV CSV when you want Technical Trend.
-4. Record supporting work in Research and review Fundamentals.
-5. Import a Macro JSON snapshot when new data is available.
+4. Review company history and ratios in Fundamentals.
+5. Use Macro for factual market context when a new JSON snapshot is available.
 6. Click Save, then export a backup regularly.
 
-ACTIVE MODULES (7)
+CORE WORKFLOW
+Overview -> Portfolio -> Watchlist -> Delivery Screener -> Fundamentals -> Macro Context
+
+ACTIVE MODULES (6)
 Overview      Read-only daily summary of existing suite data.
 Portfolio     Holdings, BUY/SELL ledger, weighted cost, and realised/unrealised gain.
 Watchlist     Companies to watch, study, buy soon, or reject.
 Delivery      Existing ranked decision-support scores and ratings.
-Research      Company notes, cases, updates, summaries, and decisions.
 Fundamentals  Financial history, ratios, quality context, and red flags.
 Macro         Factual imported Indian macro readings.
+
+RESEARCH LIBRARY COMPATIBILITY
+Legacy Research Library data remains preserved in backups but is no longer part
+of the active workflow. Opening or saving the platform does not rewrite it.
 
 INTRADAY SEPARATION
 Intraday trading is being developed as a separate satellite project. Existing
@@ -43,9 +49,9 @@ confirm the replacement. Import replaces the suite's current browser data,
 so export the current state first if it may be needed later.
 
 PRIVACY AND USE
-Your portfolio and research remain in the local browser unless you copy or
-share an exported backup. Protect backup files because they may contain
-private financial information.
+Your portfolio and other stored data remain in the local browser unless you
+copy or share an exported backup. Protect backup files because they may contain
+private financial information, including preserved legacy records.
 
 Scores, ratings, and rankings are decision support only. They are not
 automatic investment advice or buy/sell instructions.

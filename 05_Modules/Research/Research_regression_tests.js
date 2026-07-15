@@ -64,7 +64,7 @@ assertDeepEqual("JSON backup round-trip preserves legacy raw values", backupRoun
 ]);
 
 const deliverySource = fs.readFileSync(path.join(suiteRoot, 'js/modules/delivery-screener.js'), 'utf8');
-assertExact("Delivery Research link still targets the Research route", deliverySource.includes("App.switchTo('research')"), true);
+assertExact("Delivery no longer exposes the inactive Research route", deliverySource.includes("App.switchTo('research')"), false);
 
 console.log("=== RL-01: Entry Validation ===");
 assertExact("Valid ticker + title", ResearchModule.validateEntry("TCS", "Q1 notes"), true);

@@ -206,7 +206,7 @@ const DeliveryScreenerModule = (function () {
     container.innerHTML = `
       <div class="module-header">
         <h2>Delivery Screener</h2>
-        <p class="module-sub">Which companies deserve your research this week — not a buy/sell signal, a shortlist to start from.</p>
+        <p class="module-sub">Which companies deserve closer study this week — not a buy/sell signal, a shortlist to start from.</p>
       </div>
       <div class="panel" id="ds-price-import-panel" style="margin-bottom:20px;max-width:none;">
         <div class="section-head" style="margin-bottom:12px;"><span class="section-title" style="font-size:15px;">Import Price History CSV</span></div>
@@ -405,8 +405,7 @@ const DeliveryScreenerModule = (function () {
             <div class="module-sub" style="margin-top:10px;">
               Related: <a href="#" onclick="App.switchTo('fundamentals');return false;" style="color:var(--amber-bright);">Fundamentals</a> ·
               <a href="#" onclick="App.switchTo('portfolio');return false;" style="color:var(--amber-bright);">Portfolio</a> ·
-              <a href="#" onclick="App.switchTo('watchlist');return false;" style="color:var(--amber-bright);">Watchlist</a> ·
-              <a href="#" onclick="App.switchTo('research');return false;" style="color:var(--amber-bright);">Research</a>
+              <a href="#" onclick="App.switchTo('watchlist');return false;" style="color:var(--amber-bright);">Watchlist</a>
             </div>
           </div>
         </div>

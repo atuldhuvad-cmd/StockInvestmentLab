@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Wealth Intelligence Suite</title>
+<title>Personal Delivery Investment and Portfolio Management Platform</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,500&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -14,7 +14,7 @@
 <div class="status-bar" id="status-bar"></div>
 
 <div class="masthead">
-  <div class="wordmark">Wealth Intelligence <em>Suite</em></div>
+  <div class="wordmark">Delivery Investment <em>Platform</em></div>
   <div class="toolbar">
     <button id="btn-save">Save</button>
     <button id="btn-export">Export backup</button>
@@ -45,21 +45,19 @@
 <script src="js/modules/watchlist.js"></script>
 <script src="js/modules/portfolio.js"></script>
 <script src="js/modules/delivery-screener.js"></script>
-<script src="js/modules/research.js"></script>
 <script src="js/modules/macro.js"></script>
 
 <!-- Shell (must load after modules, before the registration script below) -->
 <script src="js/app.js"></script>
 
 <script>
-  // Module registration — the only place that knows about all seven active modules.
+  // Module registration — the only place that knows about all six active modules.
   // Adding a module later means one line here, nothing else in this file
   // changes.
   App.registerModule("overview", "Overview", OverviewModule.render, "ready");
   App.registerModule("portfolio", "Portfolio", PortfolioModule.render, "ready");
   App.registerModule("watchlist", "Watchlist", WatchlistModule.render, "ready");
   App.registerModule("delivery", "Delivery", DeliveryScreenerModule.render, "ready");
-  App.registerModule("research", "Research", ResearchModule.render, "ready");
   App.registerModule("fundamentals", "Fundamentals", FundamentalsModule.render, "ready");
   App.registerModule("macro", "Macro", MacroModule.render, "ready");
 
