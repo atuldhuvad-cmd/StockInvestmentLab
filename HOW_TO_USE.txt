@@ -1,4 +1,4 @@
-PERSONAL DELIVERY INVESTMENT AND PORTFOLIO MANAGEMENT PLATFORM v1.6
+PERSONAL DELIVERY INVESTMENT AND PORTFOLIO MANAGEMENT PLATFORM v1.7
 ============================================================
 
 OPEN THE APPLICATION
@@ -93,10 +93,28 @@ a valid non-future sale date, quantity, price, and optional charges or exit
 notes. Partial and full sales preserve realised results and transaction history.
 Delete is only for correcting a bad record; it is never treated as a sale.
 
-Paper prices use the latest close from an offline imported OHLCV file and show
-its date clearly. This is historical data, not a live quote. If no imported
-price exists, enter a Manual paper price with a mandatory date. Never enter an
-invented price.
+PAPER PRICE EVIDENCE
+The normal Open_Wealth_Intelligence_Suite.bat launcher remains fully offline.
+For optional recent Angel One quotes, first follow
+10_Integrations\AngelOneQuotes\HOW_TO_USE_QUOTES.txt, keep the real credentials
+only in the Git-ignored angelone_credentials.env file, and then double-click
+Open_Wealth_Suite_With_Quotes.bat.
+
+In Paper Buy or Paper Sell, choose Get Latest Price. During NSE market hours a
+quote up to five minutes old is Current; an older quote is Stale and blocked.
+Outside market hours, the last available broker quote is allowed and labelled
+Market Closed — Latest Available Price. Refresh Price repeats the read-only
+request. The helper binds only to 127.0.0.1 and has no order-placement route.
+
+If the helper is unavailable, select Manual Price and enter the price, observed
+date, observed time, and a source or note. Imported daily CSV closes can be
+selected only as clearly labelled historical prices and are never called live.
+The selected price, timestamp, source, status, and available age evidence are
+stored with the simulated paper transaction. Existing v1.6 transactions remain
+valid without fabricated evidence.
+
+No real order is placed. Paper prices are simulation evidence only; never enter
+an invented price.
 
 After 1–3 months, use Performance Review for realised/unrealised results,
 drawdown, holding periods, entry-rating groups, Technical-status groups, and

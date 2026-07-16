@@ -8,7 +8,7 @@ A verified **Personal Delivery Investment and Portfolio Management Platform**
 (`01_Source\wealth-suite`), built in pure HTML/CSS/JS with IndexedDB persistence,
 alongside formal, evidence-based verification history.
 
-## Active application (wealth-suite-v1.6)
+## Active application (wealth-suite-v1.7)
 
 The focused platform has five active navigation modules, in this order:
 Overview, Portfolio, Watchlist, Delivery, and Fundamentals. Overview opens by
@@ -17,8 +17,15 @@ default.
 Delivery includes an isolated Paper Delivery facility with Screener, Paper
 Portfolio, Paper Transactions, and Performance Review sub-tabs. Paper capital,
 transactions, holdings, realised results, and entry-score snapshots remain
-separate from the real Portfolio. Offline imported closes are always shown with
-their dates and are never described as live prices.
+separate from the real Portfolio. An optional localhost-only Python helper can
+retrieve read-only Angel One quotes for Paper Buy/Sell. Browser code never holds
+broker credentials, stale market-hours quotes are blocked after five minutes,
+and no order endpoints exist. Manual prices require observed date, time, and
+source. Offline imported closes remain explicitly historical and never live.
+
+Use `Open_Wealth_Intelligence_Suite.bat` for the normal offline app. Use
+`Open_Wealth_Suite_With_Quotes.bat` only after locally configuring the ignored
+credential file described in `10_Integrations\AngelOneQuotes\HOW_TO_USE_QUOTES.txt`.
 
 Core workflow: Overview → Portfolio → Watchlist → Delivery Screener →
 Fundamentals.

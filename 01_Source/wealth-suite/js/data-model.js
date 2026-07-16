@@ -59,7 +59,10 @@ const WealthData = (function () {
       // safe empty/default values through replaceAll().
       paperDeliveryTransactions: [
         // { id, ticker, transactionType: 'BUY'|'SELL', transactionDate,
-        //   quantity, price, charges, notes, createdAt, entrySnapshot? }
+        //   quantity, price, priceSource?, priceTimestamp?, priceStatus?,
+        //   quoteAgeSeconds?, manualPriceNote?, charges, notes, createdAt,
+        //   entrySnapshot? }. Price evidence is required for new v1.7
+        //   entries; absent fields on legacy v1.6 records remain valid.
       ],
       paperDeliveryConfig: {
         startingCapital: 0,

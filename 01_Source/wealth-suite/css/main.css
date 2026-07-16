@@ -181,6 +181,12 @@ tbody tr:hover td { background: var(--bg-ticket); color: var(--paper); }
 .paper-summary { margin-top:0; }
 .paper-manual-price { display:grid; gap:8px; margin:12px 0; }
 .paper-manual-price input { width:100%; min-height:var(--touch); padding:0 10px; background:var(--bg-raised); border:1px solid var(--rule-bright); color:var(--paper); font-family:var(--mono); }
+.paper-price-selector { border:1px solid var(--rule-bright); margin:16px 0 0; padding:14px; }
+.paper-price-selector legend { color:var(--amber-bright); font-family:var(--sans); font-size:12px; padding:0 6px; }
+.paper-price-choice { display:block; color:var(--paper); font-family:var(--sans); font-size:12px; margin:10px 0; }
+.paper-price-choice input { margin-right:7px; }
+.paper-quote-status { display:grid; gap:5px; margin:12px 0; padding:10px; border:1px dashed var(--rule); color:var(--paper-dim); font-family:var(--mono); font-size:11px; }
+.paper-quote-status strong { color:var(--amber-bright); }
 .paper-review-grid { display:grid; grid-template-columns:1fr; gap:14px; margin:16px 0; }
 
 @media (min-width: 768px) {

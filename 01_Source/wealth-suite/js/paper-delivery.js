@@ -250,15 +250,17 @@ const PaperDelivery = (function () {
     const config = normalizeConfig(state && state.paperDeliveryConfig);
     const manual = config.manualPrices[String(ticker || "").toUpperCase()];
     const manualPrice = finiteNumber(manual && manual.price);
+    const manualTimestamp = manual && (manual.timestamp || manual.priceTimestamp || manual.date);
+    const manualDate = typeof manualTimestamp === "string" ? manualTimestamp.slice(0, 10) : null;
     if (manual && manualPrice !== null && manualPrice > 0 &&
-        isValidDate(manual.date, "9999-12-31")) {
-      const stale = manual.date < today;
+        isValidDate(manualDate, "9999-12-31")) {
+      const stale = manualDate < today;
       return {
         price: manualPrice,
-        date: manual.date,
+        date: manualDate,
         source: "Manual paper price",
         stale: stale,
-        label: "Manual paper price · " + manual.date + (stale ? " · Historical, not live" : "")
+        label: "Manual price · " + manualTimestamp + (stale ? " · Historical, not live" : "")
       };
     }
     return {
@@ -270,13 +272,10 @@ const PaperDelivery = (function () {
     };
   }
 
-  function validateManualPrice(input, today = localISODate()) {
-    const price = finiteNumber(input && input.price);
-    if (price === null || price <= 0) return "Manual paper price must be greater than zero";
-    if (!isValidDate(input && input.date, today)) {
-      return "Manual paper-price date is required, valid, and cannot be in the future";
-    }
-    return null;
+  function validateManualPrice(input, now = new Date()) {
+    if (typeof PaperQuotes === "undefined") return "Manual-price validation is unavailable";
+    const evidence = PaperQuotes.manualEvidence(input, now);
+    return evidence.ok ? null : evidence.error;
   }
 
   function snapshotCandidate(candidate, reason) {
@@ -316,6 +315,10 @@ const PaperDelivery = (function () {
     if (quantity === null || quantity <= 0) return { ok: false, error: "Quantity must be greater than zero" };
     if (price === null || price <= 0) return { ok: false, error: "Price must be greater than zero" };
     if (charges < 0) return { ok: false, error: "Charges must be zero or greater" };
+    const evidenceError = typeof PaperQuotes === "undefined"
+      ? "Price-evidence validation is unavailable"
+      : PaperQuotes.validateStoredEvidence(input, options.now || new Date());
+    if (evidenceError) return { ok: false, error: evidenceError };
 
     const current = replay(transactions, today);
     if (current.errors.length) return { ok: false, error: "Existing paper ledger contains an invalid transaction" };
@@ -352,6 +355,12 @@ const PaperDelivery = (function () {
       transactionDate: input.transactionDate,
       quantity: quantity,
       price: price,
+      priceSource: String(input.priceSource || "").trim(),
+      priceTimestamp: input.priceTimestamp,
+      priceStatus: input.priceStatus,
+      quoteAgeSeconds: finiteNumber(input.quoteAgeSeconds),
+      manualPriceNote: input.priceStatus === "Manual price"
+        ? String(input.manualPriceNote || "").trim() : null,
       charges: charges,
       notes: String(input.notes || "").trim(),
       createdAt: options.createdAt || new Date().toISOString()
@@ -583,7 +592,8 @@ const PaperDelivery = (function () {
     );
     const output = [[
       "Date", "Ticker", "Type", "Quantity", "Price", "Charges",
-      "Gross Amount", "Net Amount", "Realised Gain/Loss", "Notes"
+      "Gross Amount", "Net Amount", "Realised Gain/Loss", "Price Source",
+      "Price Timestamp", "Price Status", "Quote Age Seconds", "Manual Price Note", "Notes"
     ]].concat(rows.map(transaction => [
       transaction.transactionDate,
       transaction.ticker,
@@ -594,6 +604,11 @@ const PaperDelivery = (function () {
       transaction.grossAmount,
       transaction.netAmount,
       transaction.realisedGain,
+      transaction.priceSource,
+      transaction.priceTimestamp,
+      transaction.priceStatus,
+      transaction.quoteAgeSeconds,
+      transaction.manualPriceNote,
       transaction.notes
     ]));
     return output.map(row => row.map(escape).join(",")).join("\n");

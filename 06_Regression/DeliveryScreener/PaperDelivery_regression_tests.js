@@ -26,6 +26,7 @@ function load(relative, globalName) {
 }
 
 load("js/price-history.js", "PriceHistory");
+load("js/paper-quotes.js", "PaperQuotes");
 load("js/paper-delivery.js", "PaperDelivery");
 load("js/data-model.js", "WealthData");
 
@@ -54,13 +55,21 @@ const config = {
   manualPrices: {}
 };
 const transactions = [];
+const priceEvidence = {
+  priceSource: "Manual price · regression fixture",
+  priceTimestamp: "2026-07-16T10:00:00+05:30",
+  priceStatus: "Manual price",
+  quoteAgeSeconds: 7200,
+  manualPriceNote: "regression fixture"
+};
+const now = new Date("2026-07-16T12:00:00+05:30");
 
 function plan(input, options) {
   return PaperDelivery.createTransactionPlan(
     transactions,
     config,
-    input,
-    { today: today, candidate: candidate, ...(options || {}) }
+    { ...priceEvidence, ...input },
+    { today: today, now: now, candidate: candidate, ...(options || {}) }
   );
 }
 
@@ -72,8 +81,8 @@ const zeroCapital = PaperDelivery.createTransactionPlan([], {
   maxOpenHoldings: 10
 }, {
   ticker: "TCS", transactionType: "BUY", transactionDate: "2026-01-01",
-  quantity: 1, price: 100, charges: 0
-}, { today: today, candidate: candidate });
+  quantity: 1, price: 100, charges: 0, ...priceEvidence
+}, { today: today, now: now, candidate: candidate });
 assertExact("Zero paper capital blocks BUY", zeroCapital.error, "Set paper capital before creating a paper position");
 assertExact("Valid paper capital configuration", PaperDelivery.validateConfig(config), null);
 assertExact("BUY date is mandatory", plan({
@@ -163,8 +172,8 @@ const allocationBlocked = PaperDelivery.createTransactionPlan([], {
   startingCapital: 10000, maxAllocationPct: 10, maxOpenHoldings: 3
 }, {
   ticker: "TCS", transactionType: "BUY", transactionDate: "2026-01-01",
-  quantity: 11, price: 100, charges: 0
-}, { today: today, candidate: candidate });
+  quantity: 11, price: 100, charges: 0, ...priceEvidence
+}, { today: today, now: now, candidate: candidate });
 assertExact("Allocation cap enforced", allocationBlocked.ok, false);
 
 const existingOpen = [{
@@ -175,8 +184,8 @@ const openCap = PaperDelivery.createTransactionPlan(existingOpen, {
   startingCapital: 10000, maxAllocationPct: 100, maxOpenHoldings: 1
 }, {
   ticker: "BBB", transactionType: "BUY", transactionDate: "2026-01-02",
-  quantity: 1, price: 100, charges: 0
-}, { today: today, candidate: { ...candidate, ticker: "BBB" } });
+  quantity: 1, price: 100, charges: 0, ...priceEvidence
+}, { today: today, now: now, candidate: { ...candidate, ticker: "BBB" } });
 assertExact("Open-position cap enforced", openCap.ok, false);
 
 const frozenSnapshot = JSON.stringify(first.transaction.entrySnapshot);
@@ -194,9 +203,9 @@ const imported = PaperDelivery.getCurrentPrice("TCS", {
 assertExact("Imported latest price selected", imported.price, 102);
 assertExact("Imported latest price date", imported.date, "2026-01-02");
 assertExact("Stale imported price labelled historical", imported.label.includes("Historical, not live"), true);
-assertExact("Manual price update requires date", PaperDelivery.validateManualPrice({
-  price: 100, date: ""
-}, today), "Manual paper-price date is required, valid, and cannot be in the future");
+assertExact("Manual price update requires date and time", PaperDelivery.validateManualPrice({
+  price: 100, observedDate: "", observedTime: "", sourceNote: "fixture"
+}, now), "Manual price requires an observed date and time");
 
 assertClose("Maximum drawdown", PaperDelivery.maximumDrawdown([100, 120, 90, 150]), 25);
 
@@ -234,6 +243,7 @@ WealthData.reset();
 WealthData.replaceAll(JSON.parse(backup));
 assertExact("Backup round-trip paper transactions", WealthData.getPaperDeliveryTransactions().length, 4);
 assertExact("Backup round-trip paper capital", WealthData.getPaperDeliveryConfig().startingCapital, 10000);
+assertExact("Backup round-trip preserves price timestamp", WealthData.getPaperDeliveryTransactions()[0].priceTimestamp, priceEvidence.priceTimestamp);
 
 WealthData.replaceAll({ holdings: [], portfolioTransactions: [], meta: { schemaVersion: 4 } });
 assertExact("v1.5 backup defaults paper transactions empty", WealthData.getPaperDeliveryTransactions().length, 0);
@@ -241,7 +251,10 @@ assertExact("v1.5 backup defaults paper capital zero", WealthData.getPaperDelive
 assertExact("Opening old state creates no fake paper records", WealthData.get().paperDeliveryTransactions.length, 0);
 
 const csv = PaperDelivery.csv(transactions);
-assertExact("Paper CSV has required header", csv.startsWith("Date,Ticker,Type,Quantity,Price,Charges,Gross Amount,Net Amount,Realised Gain/Loss,Notes"), true);
+assertExact("Paper CSV includes price evidence", csv.startsWith("Date,Ticker,Type,Quantity,Price,Charges,Gross Amount,Net Amount,Realised Gain/Loss,Price Source,Price Timestamp,Price Status,Quote Age Seconds,Manual Price Note,Notes"), true);
+assertExact("New BUY stores price source", transactions[0].priceSource, priceEvidence.priceSource);
+assertExact("New SELL stores price status", transactions[2].priceStatus, "Manual price");
+assertExact("Old v1.6 transaction without evidence still replays", PaperDelivery.replay(existingOpen, today).holdings.length, 1);
 assertExact("Dependent BUY cannot be deleted as correction", PaperDelivery.canDeleteTransaction(transactions, 1, today).ok, false);
 assertExact("SELL can be deleted as correction", PaperDelivery.canDeleteTransaction(transactions, 4, today).ok, true);
 

@@ -28,6 +28,7 @@ const DeliveryScreenerModule = (function () {
   let pendingBuyTicker = null;
   let pendingSellTicker = null;
   let submitting = false;
+  const recentPaperQuotes = {};
 
   function scoreBand(value, points) {
     if (value === null || value === undefined) return null;
@@ -503,6 +504,129 @@ const DeliveryScreenerModule = (function () {
     if (activeContainer) render(activeContainer);
   }
 
+  function quoteDetails(quote) {
+    if (!quote) {
+      return '<div class="paper-quote-status" data-quote-details>Quote status: Unavailable</div>';
+    }
+    return '<div class="paper-quote-status" data-quote-details>' +
+      '<strong>' + paperEscape(quote.status) + '</strong>' +
+      '<span>Quote price: ' + paperMoney(quote.price) + '</span>' +
+      '<span>Timestamp: ' + paperEscape(quote.quoteTimestamp) + '</span>' +
+      '<span>Source: ' + paperEscape(quote.source) + '</span>' +
+      '<span>Data age: ' + paperEscape(PaperQuotes.formatAge(quote.ageSeconds)) + '</span>' +
+      '</div>';
+  }
+
+  function renderPriceSelector(prefix, ticker, currentPrice) {
+    const quote = recentPaperQuotes[ticker];
+    const quoteUsable = quote && quote.usable;
+    const importedAvailable = currentPrice && currentPrice.price !== null &&
+      currentPrice.source === "Imported close";
+    return [
+      '<fieldset class="paper-price-selector"><legend>Price evidence to record</legend>',
+      '<div class="paper-action-row"><button type="button" class="btn" data-get-paper-quote="' +
+        paperEscape(ticker) + '" data-quote-prefix="' + prefix + '">' +
+        (quote ? "Refresh Price" : "Get Latest Price") + '</button></div>',
+      quoteDetails(quote),
+      '<label class="paper-price-choice"><input type="radio" name="paper-' + prefix +
+        '-price-source" value="quote" ' + (quoteUsable ? "checked" : "disabled") +
+        '> Angel One recent quote</label>',
+      '<label class="paper-price-choice"><input type="radio" name="paper-' + prefix +
+        '-price-source" value="manual" ' + (quoteUsable ? "" : "checked") + '> Manual Price</label>',
+      '<div class="paper-manual-price" data-manual-evidence>',
+      '<input id="paper-' + prefix + '-manual-price" type="number" min="0.000001" step="any" placeholder="Manual price">',
+      '<input id="paper-' + prefix + '-observed-date" type="date" aria-label="Manual observed date">',
+      '<input id="paper-' + prefix + '-observed-time" type="time" aria-label="Manual observed time">',
+      '<input id="paper-' + prefix + '-manual-note" type="text" placeholder="Source or note">',
+      '</div>',
+      importedAvailable ? [
+        '<label class="paper-price-choice"><input type="radio" name="paper-' + prefix +
+          '-price-source" value="imported"> Imported historical close — ' +
+          paperMoney(currentPrice.price) + ' on ' + paperEscape(currentPrice.date) + '</label>',
+        '<p class="module-sub">Imported daily CSV history is historical and is never a live quote.</p>'
+      ].join("") : '',
+      '<p class="module-sub" data-price-selection>Selected: ' +
+        (quoteUsable ? paperEscape(quote.status + " · " + quote.source) : "Manual Price") + '</p>',
+      '</fieldset>'
+    ].join("");
+  }
+
+  function selectedPriceEvidence(container, prefix, currentPrice) {
+    const selected = container.querySelector('input[name="paper-' + prefix + '-price-source"]:checked');
+    const mode = selected ? selected.value : "manual";
+    if (mode === "quote") {
+      const ticker = prefix === "buy" ? pendingBuyTicker : pendingSellTicker;
+      return PaperQuotes.transactionEvidence(recentPaperQuotes[ticker]);
+    }
+    if (mode === "imported") {
+      if (!currentPrice || currentPrice.price === null || !currentPrice.date) {
+        return { ok: false, error: "Imported historical close is unavailable" };
+      }
+      return {
+        ok: true,
+        price: currentPrice.price,
+        priceSource: "Imported daily CSV · Historical close",
+        priceTimestamp: currentPrice.date,
+        quoteAgeSeconds: null,
+        priceStatus: "Imported historical close",
+        manualPriceNote: null
+      };
+    }
+    const note = container.querySelector("#paper-" + prefix + "-manual-note").value;
+    const evidence = PaperQuotes.manualEvidence({
+      price: container.querySelector("#paper-" + prefix + "-manual-price").value,
+      observedDate: container.querySelector("#paper-" + prefix + "-observed-date").value,
+      observedTime: container.querySelector("#paper-" + prefix + "-observed-time").value,
+      sourceNote: note
+    });
+    if (evidence.ok) evidence.manualPriceNote = note.trim();
+    return evidence;
+  }
+
+  function bindPriceSelectors(container) {
+    container.querySelectorAll("[data-get-paper-quote]").forEach(button => {
+      button.addEventListener("click", async () => {
+        const ticker = button.dataset.getPaperQuote;
+        const prefix = button.dataset.quotePrefix;
+        const fieldset = button.closest(".paper-price-selector");
+        button.disabled = true;
+        try {
+          const quote = await PaperQuotes.fetchLatest(ticker);
+          recentPaperQuotes[ticker] = quote;
+          const details = fieldset.querySelector("[data-quote-details]");
+          details.outerHTML = quoteDetails(quote);
+          const quoteChoice = fieldset.querySelector('input[value="quote"]');
+          quoteChoice.disabled = !quote.usable;
+          const manualHasValue = ["manual-price", "observed-date", "observed-time", "manual-note"]
+            .some(suffix => fieldset.querySelector("#paper-" + prefix + "-" + suffix).value);
+          if (quote.usable && !manualHasValue) quoteChoice.checked = true;
+          const selected = fieldset.querySelector('input[name="paper-' + prefix + '-price-source"]:checked');
+          fieldset.querySelector("[data-price-selection]").textContent = "Selected: " +
+            (selected && selected.value === "quote" ? quote.status + " · " + quote.source : "Manual Price");
+          button.textContent = "Refresh Price";
+          App.showStatus(quote.usable ? "Recent paper quote received" : "Quote is stale; refresh or use Manual Price", quote.usable ? "ok" : "error");
+        } catch (error) {
+          const details = fieldset.querySelector("[data-quote-details]");
+          details.textContent = error.message || "Quote service unavailable — use a dated manual price";
+          App.showStatus(details.textContent, "error");
+        } finally {
+          button.disabled = false;
+        }
+      });
+    });
+    container.querySelectorAll('.paper-price-selector input[type="radio"]').forEach(input => {
+      input.addEventListener("change", () => {
+        const fieldset = input.closest(".paper-price-selector");
+        const ticker = input.name.includes("buy") ? pendingBuyTicker : pendingSellTicker;
+        const quote = recentPaperQuotes[ticker];
+        let label = "Manual Price";
+        if (input.value === "quote" && quote) label = quote.status + " · " + quote.source;
+        if (input.value === "imported") label = "Imported historical close · Not live";
+        fieldset.querySelector("[data-price-selection]").textContent = "Selected: " + label;
+      });
+    });
+  }
+
   function renderPaperSummary(summary) {
     return '<div class="ratio-grid paper-summary">' +
       paperMetric("Starting Paper Capital", paperMoney(summary.config.startingCapital)) +
@@ -538,11 +662,10 @@ const DeliveryScreenerModule = (function () {
   function renderBuyForm(candidate, currentPrice) {
     if (!candidate) return "";
     const snapshot = PaperDelivery.snapshotCandidate(candidate, "");
-    const imported = currentPrice.price !== null;
     return [
       '<div class="panel paper-panel paper-entry-panel">',
       '<div class="section-head"><span class="section-title">Paper Buy — ' + paperEscape(candidate.ticker) + '</span></div>',
-      '<p class="module-sub">' + paperEscape(currentPrice.label) + '. Offline imported prices are historical observations, not live quotes.</p>',
+      '<p class="module-sub">Use a recent read-only quote, explicit Manual Price, or a clearly selected imported historical close.</p>',
       '<div class="ratio-grid">',
       paperMetric("Delivery Score", scoreText(snapshot.deliveryOverallScore)),
       paperMetric("Entry Rating", snapshot.deliveryRating),
@@ -551,13 +674,13 @@ const DeliveryScreenerModule = (function () {
       paperMetric("Price Coverage", snapshot.priceHistoryCoverage),
       '</div>',
       '<div class="paper-form-grid">',
-      '<div class="field-row paper-field"><label for="paper-buy-date">Buy date</label><input id="paper-buy-date" type="date" value="' + paperEscape(currentPrice.date || "") + '"></div>',
+      '<div class="field-row paper-field"><label for="paper-buy-date">Buy date</label><input id="paper-buy-date" type="date" value="' + paperEscape(PaperDelivery.localISODate()) + '"></div>',
       '<div class="field-row paper-field"><label for="paper-buy-quantity">Quantity</label><input id="paper-buy-quantity" type="number" min="0.000001" step="any"></div>',
-      '<div class="field-row paper-field"><label for="paper-buy-price">' + (imported ? "Paper buy price" : "Manual paper price") + '</label><input id="paper-buy-price" type="number" min="0.000001" step="any" value="' + (currentPrice.price === null ? "" : paperEscape(currentPrice.price)) + '"></div>',
       '<div class="field-row paper-field"><label for="paper-buy-charges">Charges</label><input id="paper-buy-charges" type="number" min="0" step="0.01" value="0"></div>',
       '<div class="field-row paper-field paper-field-wide"><label for="paper-buy-reason">Reason for paper buy</label><textarea id="paper-buy-reason" rows="2"></textarea></div>',
       '<div class="field-row paper-field paper-field-wide"><label for="paper-buy-notes">Notes</label><textarea id="paper-buy-notes" rows="2"></textarea></div>',
       '</div>',
+      renderPriceSelector("buy", candidate.ticker, currentPrice),
       '<div class="paper-action-row"><button class="btn" id="paper-confirm-buy">Record Paper Buy</button><button class="ticker-chip" id="paper-cancel-buy">Cancel</button></div>',
       '</div>'
     ].join("");
@@ -570,13 +693,13 @@ const DeliveryScreenerModule = (function () {
       '<div class="section-head"><span class="section-title">Paper Sell — ' + paperEscape(holding.ticker) + '</span></div>',
       '<p class="module-sub">Available quantity: ' + paperEscape(holding.quantity) + '. ' + paperEscape(currentPrice.label) + '.</p>',
       '<div class="paper-form-grid">',
-      '<div class="field-row paper-field"><label for="paper-sell-date">Sell date</label><input id="paper-sell-date" type="date" value="' + paperEscape(currentPrice.date || "") + '"></div>',
+      '<div class="field-row paper-field"><label for="paper-sell-date">Sell date</label><input id="paper-sell-date" type="date" value="' + paperEscape(PaperDelivery.localISODate()) + '"></div>',
       '<div class="field-row paper-field"><label for="paper-sell-quantity">Quantity</label><input id="paper-sell-quantity" type="number" min="0.000001" max="' + paperEscape(holding.quantity) + '" step="any" value="' + paperEscape(holding.quantity) + '"></div>',
-      '<div class="field-row paper-field"><label for="paper-sell-price">' + (currentPrice.price === null ? "Manual paper price" : "Paper sell price") + '</label><input id="paper-sell-price" type="number" min="0.000001" step="any" value="' + (currentPrice.price === null ? "" : paperEscape(currentPrice.price)) + '"></div>',
       '<div class="field-row paper-field"><label for="paper-sell-charges">Charges</label><input id="paper-sell-charges" type="number" min="0" step="0.01" value="0"></div>',
       '<div class="field-row paper-field paper-field-wide"><label for="paper-sell-reason">Exit reason</label><textarea id="paper-sell-reason" rows="2"></textarea></div>',
       '<div class="field-row paper-field paper-field-wide"><label for="paper-sell-notes">Notes</label><textarea id="paper-sell-notes" rows="2"></textarea></div>',
       '</div>',
+      renderPriceSelector("sell", holding.ticker, currentPrice),
       '<div class="paper-action-row"><button class="btn" id="paper-confirm-sell">Record Paper Sell</button><button class="ticker-chip" id="paper-cancel-sell">Cancel</button></div>',
       '</div>'
     ].join("");
@@ -590,6 +713,8 @@ const DeliveryScreenerModule = (function () {
         '<div class="paper-manual-price">',
         '<input type="number" min="0.000001" step="any" data-manual-price placeholder="Manual paper price">',
         '<input type="date" data-manual-price-date>',
+        '<input type="time" data-manual-price-time>',
+        '<input type="text" data-manual-price-note placeholder="Source or note">',
         '<button class="ticker-chip" data-save-manual-price="' + paperEscape(holding.ticker) + '">Save Price</button>',
         '</div>'
       ].join("") : "";
@@ -635,6 +760,8 @@ const DeliveryScreenerModule = (function () {
         '<p class="module-sub">No imported price is available. Enter a dated manual paper price.</p>',
         '<input type="number" min="0.000001" step="any" data-manual-price placeholder="Manual paper price">',
         '<input type="date" data-manual-price-date>',
+        '<input type="time" data-manual-price-time>',
+        '<input type="text" data-manual-price-note placeholder="Source or note">',
         '<button class="ticker-chip" data-save-manual-price="' + paperEscape(holding.ticker) + '">Save Price</button>',
         '</div>'
       ].join("") : "";
@@ -696,12 +823,24 @@ const DeliveryScreenerModule = (function () {
       if (submitting) return;
       submitting = true;
       confirmBuy.disabled = true;
+      const evidence = selectedPriceEvidence(container, "buy", buyPrice);
+      if (!evidence.ok) {
+        submitting = false;
+        confirmBuy.disabled = false;
+        App.showStatus(evidence.error, "error");
+        return;
+      }
       const input = {
         ticker: buyCandidate.ticker,
         transactionType: "BUY",
         transactionDate: container.querySelector("#paper-buy-date").value,
         quantity: container.querySelector("#paper-buy-quantity").value,
-        price: container.querySelector("#paper-buy-price").value,
+        price: evidence.price,
+        priceSource: evidence.priceSource,
+        priceTimestamp: evidence.priceTimestamp,
+        priceStatus: evidence.priceStatus,
+        quoteAgeSeconds: evidence.quoteAgeSeconds,
+        manualPriceNote: evidence.manualPriceNote,
         charges: container.querySelector("#paper-buy-charges").value,
         reason: container.querySelector("#paper-buy-reason").value,
         notes: container.querySelector("#paper-buy-notes").value
@@ -736,12 +875,24 @@ const DeliveryScreenerModule = (function () {
       if (submitting) return;
       submitting = true;
       confirmSell.disabled = true;
+      const evidence = selectedPriceEvidence(container, "sell", sellPrice);
+      if (!evidence.ok) {
+        submitting = false;
+        confirmSell.disabled = false;
+        App.showStatus(evidence.error, "error");
+        return;
+      }
       const input = {
         ticker: sellHolding.ticker,
         transactionType: "SELL",
         transactionDate: container.querySelector("#paper-sell-date").value,
         quantity: container.querySelector("#paper-sell-quantity").value,
-        price: container.querySelector("#paper-sell-price").value,
+        price: evidence.price,
+        priceSource: evidence.priceSource,
+        priceTimestamp: evidence.priceTimestamp,
+        priceStatus: evidence.priceStatus,
+        quoteAgeSeconds: evidence.quoteAgeSeconds,
+        manualPriceNote: evidence.manualPriceNote,
         charges: container.querySelector("#paper-sell-charges").value,
         reason: container.querySelector("#paper-sell-reason").value,
         notes: container.querySelector("#paper-sell-notes").value
@@ -772,13 +923,19 @@ const DeliveryScreenerModule = (function () {
         refreshPaper();
       });
     });
+    bindPriceSelectors(container);
     container.querySelectorAll("[data-save-manual-price]").forEach(button => {
       button.addEventListener("click", async () => {
         const ticker = button.dataset.saveManualPrice;
         const pricePanel = button.closest(".paper-manual-price");
         const price = pricePanel.querySelector("[data-manual-price]").value;
         const date = pricePanel.querySelector("[data-manual-price-date]").value;
-        const error = PaperDelivery.validateManualPrice({ price: price, date: date });
+        const time = pricePanel.querySelector("[data-manual-price-time]").value;
+        const note = pricePanel.querySelector("[data-manual-price-note]").value;
+        const evidence = PaperQuotes.manualEvidence({
+          price: price, observedDate: date, observedTime: time, sourceNote: note
+        });
+        const error = evidence.ok ? null : evidence.error;
         if (error) { App.showStatus(error, "error"); return; }
         const config = WealthData.getPaperDeliveryConfig();
         WealthData.updatePaperDeliveryConfig({
@@ -787,6 +944,9 @@ const DeliveryScreenerModule = (function () {
             [ticker]: {
               price: Number(price),
               date: date,
+              timestamp: evidence.priceTimestamp,
+              source: evidence.priceSource,
+              note: note.trim(),
               updatedAt: new Date().toISOString()
             }
           }
@@ -810,6 +970,9 @@ const DeliveryScreenerModule = (function () {
       '<td>' + paperMoney(transaction.grossAmount) + '</td>',
       '<td>' + paperMoney(transaction.netAmount) + '</td>',
       '<td>' + paperMoney(transaction.realisedGain) + '</td>',
+      '<td>' + paperEscape(transaction.priceSource || "Legacy — evidence unavailable") + '<br><small>' +
+        paperEscape(transaction.priceTimestamp || "—") + ' · ' +
+        paperEscape(transaction.priceStatus || "—") + '</small></td>',
       '<td>' + paperEscape(transaction.notes || "—") + '</td>',
       '<td><button class="ticker-chip holding-delete" data-delete-paper="' + paperEscape(transaction.id) + '">Delete correction</button></td>',
       '</tr>'
@@ -827,6 +990,10 @@ const DeliveryScreenerModule = (function () {
         ["Gross Amount", paperMoney(transaction.grossAmount)],
         ["Net Amount", paperMoney(transaction.netAmount)],
         ["Realised Gain/Loss", paperMoney(transaction.realisedGain)],
+        ["Price Evidence", transaction.priceSource || "Legacy — evidence unavailable"],
+        ["Price Timestamp", transaction.priceTimestamp || "—"],
+        ["Price Status", transaction.priceStatus || "—"],
+        ["Quote Age", PaperQuotes.formatAge(transaction.quoteAgeSeconds)],
         ["Notes", transaction.notes || "—"]
       ].map(row => '<div class="data-card-row"><span class="k">' + paperEscape(row[0]) +
         '</span><span class="v">' + paperEscape(row[1]) + '</span></div>').join("");
@@ -848,7 +1015,7 @@ const DeliveryScreenerModule = (function () {
       '<div class="paper-action-row"><button class="btn" id="paper-export-csv">Export Paper Transactions CSV</button></div>',
       '<p class="warn-inline">Deleting a paper record is not the same as recording a paper sale. Delete is only for correcting bad data.</p>',
       transactions.length ? [
-        '<div class="table-wrap"><table><thead><tr><th>Date</th><th>Ticker</th><th>Type</th><th>Quantity</th><th>Price</th><th>Charges</th><th>Gross</th><th>Net</th><th>Realised G/L</th><th>Notes</th><th>Correction</th></tr></thead><tbody>',
+        '<div class="table-wrap"><table><thead><tr><th>Date</th><th>Ticker</th><th>Type</th><th>Quantity</th><th>Price</th><th>Charges</th><th>Gross</th><th>Net</th><th>Realised G/L</th><th>Price Evidence</th><th>Notes</th><th>Correction</th></tr></thead><tbody>',
         transactionTableRows(transactions),
         '</tbody></table></div><div class="card-list">',
         transactionCards(transactions),

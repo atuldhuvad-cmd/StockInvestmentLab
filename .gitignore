@@ -14,6 +14,20 @@ desktop.ini
 __pycache__/
 *.pyc
 
+# Optional local Angel One read-only quote helper
+10_Integrations/AngelOneQuotes/angelone_credentials.env
+10_Integrations/AngelOneQuotes/.venv/
+10_Integrations/AngelOneQuotes/.quote_service.pid
+10_Integrations/AngelOneQuotes/*.token
+10_Integrations/AngelOneQuotes/*.log
+10_Integrations/AngelOneQuotes/logs/
+10_Integrations/AngelOneQuotes/tmp/
+10_Integrations/AngelOneQuotes/*response*.json
+
+# Personal browser exports are never release artifacts
+wealth-intelligence-backup-*.json
+paper-delivery-transactions-*.csv
+
 09_Backups/CAS/
 
 09_Backups/CAS/

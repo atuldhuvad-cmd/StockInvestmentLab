@@ -1,0 +1,17 @@
+ANGEL ONE READ-ONLY QUOTE SERVICE
+=================================
+
+1. Install Python 3.10 or newer.
+2. In this folder, create a virtual environment and install requirements.txt:
+   python -m venv .venv
+   .venv\Scripts\python -m pip install -r requirements.txt
+3. Copy angelone_credentials.example.env to angelone_credentials.env.
+4. Fill the local file with your SmartAPI app key, client code, PIN, and TOTP
+   secret. The real file is Git-ignored and must never be shared.
+5. Double-click Start_Quote_Service.bat, or use the project-root launcher
+   Open_Wealth_Suite_With_Quotes.bat.
+6. Stop the helper with Stop_Quote_Service.bat when finished.
+
+The helper binds only to 127.0.0.1 and exposes GET /health and GET /quote.
+It has no order, modification, cancellation, GTT, or automated-trading route.
+The normal Wealth Suite launcher still works without this optional helper.
