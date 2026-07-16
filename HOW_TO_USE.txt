@@ -1,4 +1,4 @@
-PERSONAL DELIVERY INVESTMENT AND PORTFOLIO MANAGEMENT PLATFORM v1.7
+PERSONAL DELIVERY INVESTMENT AND PORTFOLIO MANAGEMENT PLATFORM v1.8
 ============================================================
 
 OPEN THE APPLICATION
@@ -11,19 +11,20 @@ RECOMMENDED DAILY WORKFLOW
 2. Record dated Portfolio BUY and SELL transactions when they occur.
 3. Review Watchlist and Delivery candidates.
    In Delivery, import an offline OHLCV CSV when you want Technical Trend.
-   Use Delivery Paper Trading to test a selection for 1–3 months before
+   Use the top-level Paper Trading module to test a selection for 1–3 months before
    deciding whether to use real money.
 4. Review company history and ratios in Fundamentals.
 5. Click Save, then export a backup regularly.
 
 CORE WORKFLOW
-Overview -> Portfolio -> Watchlist -> Delivery Screener -> Fundamentals
+Overview -> Portfolio -> Watchlist -> Delivery Screener -> Paper Trading -> Fundamentals
 
-ACTIVE MODULES (5)
+ACTIVE MODULES (6)
 Overview      Read-only daily summary of existing suite data.
 Portfolio     Holdings, BUY/SELL ledger, weighted cost, and realised/unrealised gain.
 Watchlist     Companies to watch, study, buy soon, or reject.
 Delivery      Existing ranked decision-support scores and ratings.
+Paper Trading Paper capital, simulated holdings, transactions, and performance.
 Fundamentals  Financial history, ratios, quality context, and red flags.
 
 MACRO COMPATIBILITY
@@ -76,15 +77,18 @@ Technical Trend is entry guidance only. Strong Trend is not an automatic buy
 signal or investment advice.
 
 DELIVERY PAPER TRADING
-Delivery contains four sub-tabs: Screener, Paper Portfolio, Paper Transactions,
-and Performance Review. Paper records are simulations and never enter the real
-Portfolio transaction ledger or real wealth totals.
+Paper Trading is a top-level module with Summary, Paper Portfolio, Transactions,
+and Performance Review sections. Paper records are simulations and never enter
+the real Portfolio transaction ledger or real wealth totals. Overview provides
+an Open Paper Trading shortcut.
 
-Before the first Paper Buy, open Paper Portfolio and set Starting Paper Capital,
+Before the first Paper Buy, open Paper Trading Summary and select Set / Change
+Paper Capital. Enter Starting Paper Capital,
 the maximum allocation per stock, and the maximum number of open holdings. Zero
-capital intentionally blocks Paper Buy. From Screener, choose Paper Buy on a
-company, confirm the dated price and quantity, optionally enter charges, notes,
-and a reason, then save. The BUY keeps a historical snapshot of the Delivery
+capital intentionally blocks Paper Buy. From Delivery, choose Paper Buy on a
+company; its purchase form opens directly in Paper Trading. Confirm the dated
+price and quantity, optionally enter charges, notes, and a reason, then save.
+The BUY keeps a historical snapshot of the Delivery
 scores, rating, Technical status, data date, and reason so later model changes
 cannot rewrite what was known at entry.
 
@@ -100,14 +104,19 @@ For optional recent Angel One quotes, first follow
 only in the Git-ignored angelone_credentials.env file, and then double-click
 Open_Wealth_Suite_With_Quotes.bat.
 
-In Paper Buy or Paper Sell, choose Get Latest Price. During NSE market hours a
+Manual Observed Price is the default workflow and requires price, observed date,
+observed time, and source/note. Source/note defaults to Angel One app; the price
+and timestamp remain blank until entered by the user.
+
+The optional API workflow is collapsed under Optional API Price Service. Choose
+Get Latest Price there when configured. During NSE market hours a
 quote up to five minutes old is Current; an older quote is Stale and blocked.
 Outside market hours, the last available broker quote is allowed and labelled
 Market Closed — Latest Available Price. Refresh Price repeats the read-only
 request. The helper binds only to 127.0.0.1 and has no order-placement route.
 
-If the helper is unavailable, select Manual Price and enter the price, observed
-date, observed time, and a source or note. Imported daily CSV closes can be
+If the helper is unavailable, Manual Observed Price continues to work without
+API credentials or the quote-service launcher. Imported daily CSV closes can be
 selected only as clearly labelled historical prices and are never called live.
 The selected price, timestamp, source, status, and available age evidence are
 stored with the simulated paper transaction. Existing v1.6 transactions remain

@@ -17,14 +17,15 @@
 const DeliveryScreenerModule = (function () {
 
   const PILLAR_WEIGHTS = { businessQuality: 0.25, financialStrength: 0.25, valuation: 0.20, technicalTrend: 0.15, risk: 0.15 };
-  const DELIVERY_TABS = [
-    ["screener", "Screener"],
-    ["paper-portfolio", "Paper Portfolio"],
-    ["paper-transactions", "Paper Transactions"],
-    ["performance-review", "Performance Review"]
+  const PAPER_SECTIONS = [
+    ["summary", "Summary"],
+    ["portfolio", "Paper Portfolio"],
+    ["transactions", "Transactions"],
+    ["performance", "Performance Review"]
   ];
-  let activeSubtab = "screener";
-  let activeContainer = null;
+  let activePaperSection = "summary";
+  let paperContainer = null;
+  let showCapitalConfig = false;
   let pendingBuyTicker = null;
   let pendingSellTicker = null;
   let submitting = false;
@@ -202,28 +203,14 @@ const DeliveryScreenerModule = (function () {
                         // concrete answer to "never scroll through 500 manually"
 
   function render(container) {
-    activeContainer = container;
     container.innerHTML = `
       <div class="module-header">
         <h2>Delivery</h2>
-        <p class="module-sub">Screen delivery candidates and test decisions in a separate paper portfolio before committing real money.</p>
+        <p class="module-sub">Rank delivery candidates across the existing five pillars. Paper Buy opens the separate Paper Trading workspace.</p>
       </div>
-      <div class="ticket-tabs delivery-subtabs">
-        ${DELIVERY_TABS.map(([key, label]) => `<button class="ticker-chip ${key === activeSubtab ? "active" : ""}" data-delivery-tab="${key}">${label}</button>`).join("")}
-      </div>
-      <div id="delivery-subtab-content"></div>
+      <div id="delivery-screener-content"></div>
     `;
-    container.querySelectorAll("[data-delivery-tab]").forEach(button => {
-      button.addEventListener("click", () => {
-        activeSubtab = button.dataset.deliveryTab;
-        render(container);
-      });
-    });
-    const content = container.querySelector("#delivery-subtab-content");
-    if (activeSubtab === "paper-portfolio") renderPaperPortfolio(content);
-    else if (activeSubtab === "paper-transactions") renderPaperTransactions(content);
-    else if (activeSubtab === "performance-review") renderPerformanceReview(content);
-    else renderScreener(content);
+    renderScreener(container.querySelector("#delivery-screener-content"));
   }
 
   function renderScreener(container) {
@@ -332,10 +319,7 @@ const DeliveryScreenerModule = (function () {
       });
       listEl.querySelectorAll("[data-paper-buy]").forEach(btn => {
         btn.addEventListener("click", () => {
-          pendingBuyTicker = btn.dataset.paperBuy;
-          pendingSellTicker = null;
-          activeSubtab = "paper-portfolio";
-          render(activeContainer);
+          openPaperBuy(btn.dataset.paperBuy);
         });
       });
     }
@@ -501,7 +485,7 @@ const DeliveryScreenerModule = (function () {
   }
 
   function refreshPaper() {
-    if (activeContainer) render(activeContainer);
+    if (paperContainer) renderPaperTrading(paperContainer);
   }
 
   function quoteDetails(quote) {
@@ -524,21 +508,23 @@ const DeliveryScreenerModule = (function () {
       currentPrice.source === "Imported close";
     return [
       '<fieldset class="paper-price-selector"><legend>Price evidence to record</legend>',
+      '<label class="paper-price-choice"><input type="radio" name="paper-' + prefix +
+        '-price-source" value="manual" checked> Manual Observed Price</label>',
+      '<div class="paper-manual-price" data-manual-evidence>',
+      '<div class="field-row paper-field"><label for="paper-' + prefix + '-manual-price">Manual observed price</label><input id="paper-' + prefix + '-manual-price" type="number" min="0.000001" step="any"></div>',
+      '<div class="field-row paper-field"><label for="paper-' + prefix + '-observed-date">Observed date</label><input id="paper-' + prefix + '-observed-date" type="date"></div>',
+      '<div class="field-row paper-field"><label for="paper-' + prefix + '-observed-time">Observed time</label><input id="paper-' + prefix + '-observed-time" type="time"></div>',
+      '<div class="field-row paper-field"><label for="paper-' + prefix + '-manual-note">Source / note</label><input id="paper-' + prefix + '-manual-note" type="text" value="Angel One app"></div>',
+      '</div>',
+      '<details class="paper-api-optional"><summary>Optional API Price Service</summary>',
       '<div class="paper-action-row"><button type="button" class="btn" data-get-paper-quote="' +
         paperEscape(ticker) + '" data-quote-prefix="' + prefix + '">' +
         (quote ? "Refresh Price" : "Get Latest Price") + '</button></div>',
       quoteDetails(quote),
       '<label class="paper-price-choice"><input type="radio" name="paper-' + prefix +
-        '-price-source" value="quote" ' + (quoteUsable ? "checked" : "disabled") +
+        '-price-source" value="quote" ' + (quoteUsable ? "" : "disabled") +
         '> Angel One recent quote</label>',
-      '<label class="paper-price-choice"><input type="radio" name="paper-' + prefix +
-        '-price-source" value="manual" ' + (quoteUsable ? "" : "checked") + '> Manual Price</label>',
-      '<div class="paper-manual-price" data-manual-evidence>',
-      '<input id="paper-' + prefix + '-manual-price" type="number" min="0.000001" step="any" placeholder="Manual price">',
-      '<input id="paper-' + prefix + '-observed-date" type="date" aria-label="Manual observed date">',
-      '<input id="paper-' + prefix + '-observed-time" type="time" aria-label="Manual observed time">',
-      '<input id="paper-' + prefix + '-manual-note" type="text" placeholder="Source or note">',
-      '</div>',
+      '</details>',
       importedAvailable ? [
         '<label class="paper-price-choice"><input type="radio" name="paper-' + prefix +
           '-price-source" value="imported"> Imported historical close — ' +
@@ -546,7 +532,7 @@ const DeliveryScreenerModule = (function () {
         '<p class="module-sub">Imported daily CSV history is historical and is never a live quote.</p>'
       ].join("") : '',
       '<p class="module-sub" data-price-selection>Selected: ' +
-        (quoteUsable ? paperEscape(quote.status + " · " + quote.source) : "Manual Price") + '</p>',
+        'Manual Observed Price · Angel One app</p>',
       '</fieldset>'
     ].join("");
   }
@@ -597,12 +583,9 @@ const DeliveryScreenerModule = (function () {
           details.outerHTML = quoteDetails(quote);
           const quoteChoice = fieldset.querySelector('input[value="quote"]');
           quoteChoice.disabled = !quote.usable;
-          const manualHasValue = ["manual-price", "observed-date", "observed-time", "manual-note"]
-            .some(suffix => fieldset.querySelector("#paper-" + prefix + "-" + suffix).value);
-          if (quote.usable && !manualHasValue) quoteChoice.checked = true;
           const selected = fieldset.querySelector('input[name="paper-' + prefix + '-price-source"]:checked');
           fieldset.querySelector("[data-price-selection]").textContent = "Selected: " +
-            (selected && selected.value === "quote" ? quote.status + " · " + quote.source : "Manual Price");
+            (selected && selected.value === "quote" ? quote.status + " · " + quote.source : "Manual Observed Price · Angel One app");
           button.textContent = "Refresh Price";
           App.showStatus(quote.usable ? "Recent paper quote received" : "Quote is stale; refresh or use Manual Price", quote.usable ? "ok" : "error");
         } catch (error) {
@@ -619,27 +602,12 @@ const DeliveryScreenerModule = (function () {
         const fieldset = input.closest(".paper-price-selector");
         const ticker = input.name.includes("buy") ? pendingBuyTicker : pendingSellTicker;
         const quote = recentPaperQuotes[ticker];
-        let label = "Manual Price";
+        let label = "Manual Observed Price · Angel One app";
         if (input.value === "quote" && quote) label = quote.status + " · " + quote.source;
         if (input.value === "imported") label = "Imported historical close · Not live";
         fieldset.querySelector("[data-price-selection]").textContent = "Selected: " + label;
       });
     });
-  }
-
-  function renderPaperSummary(summary) {
-    return '<div class="ratio-grid paper-summary">' +
-      paperMetric("Starting Paper Capital", paperMoney(summary.config.startingCapital)) +
-      paperMetric("Available Paper Cash", paperMoney(summary.availableCash)) +
-      paperMetric("Invested Paper Cost", paperMoney(summary.investedCost)) +
-      paperMetric("Current Paper Value", paperMoney(summary.currentValue)) +
-      paperMetric("Unrealised Gain/Loss", paperMoney(summary.unrealisedGain), summary.unrealisedGain < 0 ? "overview-loss" : "overview-gain") +
-      paperMetric("Realised Gain/Loss", paperMoney(summary.realisedGain), summary.realisedGain < 0 ? "overview-loss" : "overview-gain") +
-      paperMetric("Total Paper Return", paperPct(summary.totalReturnPct)) +
-      paperMetric("Open Paper Holdings", String(summary.openHoldings)) +
-      paperMetric("Closed Paper Positions", String(summary.closedPositions)) +
-      paperMetric("Maximum Drawdown", paperPct(summary.maximumDrawdown)) +
-    '</div>';
   }
 
   function renderCapitalConfig(config) {
@@ -771,6 +739,89 @@ const DeliveryScreenerModule = (function () {
     }).join("");
   }
 
+  function renderPaperTopSummary(summary) {
+    return '<div class="ratio-grid paper-summary">' +
+      paperMetric("Starting paper capital", paperMoney(summary.config.startingCapital)) +
+      paperMetric("Available paper cash", paperMoney(summary.availableCash)) +
+      paperMetric("Invested amount", paperMoney(summary.investedCost)) +
+      paperMetric("Current paper value", paperMoney(summary.currentValue)) +
+      paperMetric("Realised profit/loss", paperMoney(summary.realisedGain), summary.realisedGain < 0 ? "overview-loss" : "overview-gain") +
+      paperMetric("Unrealised profit/loss", paperMoney(summary.unrealisedGain), summary.unrealisedGain < 0 ? "overview-loss" : "overview-gain") +
+      paperMetric("Total return", paperPct(summary.totalReturnPct)) +
+      paperMetric("Open holdings", String(summary.openHoldings)) +
+    '</div>';
+  }
+
+  function bindCapitalConfig(container) {
+    const save = container.querySelector("#paper-save-config");
+    if (!save) return;
+    save.addEventListener("click", async () => {
+      const input = {
+        startingCapital: Number(container.querySelector("#paper-starting-capital").value),
+        maxAllocationPct: Number(container.querySelector("#paper-max-allocation").value),
+        maxOpenHoldings: Number(container.querySelector("#paper-max-open").value)
+      };
+      const error = PaperDelivery.validateConfig(input);
+      if (error) { App.showStatus(error, "error"); return; }
+      WealthData.updatePaperDeliveryConfig(input);
+      await App.saveNow(false);
+      showCapitalConfig = false;
+      App.showStatus("Paper capital settings saved", "ok");
+      refreshPaper();
+    });
+  }
+
+  function renderPaperSummaryScreen(container) {
+    const summary = PaperDelivery.summary(WealthData.get());
+    const empty = summary.openHoldings === 0 && !summary.latestTransaction;
+    container.innerHTML = [
+      renderPaperTopSummary(summary),
+      '<div class="paper-action-row">',
+      '<button class="btn" id="paper-change-capital">Set / Change Paper Capital</button>',
+      '<button class="ticker-chip" id="paper-go-delivery">Go to Delivery Screener</button>',
+      '</div>',
+      showCapitalConfig ? renderCapitalConfig(summary.config) : '',
+      empty ? '<p class="overview-empty paper-empty-message">No Paper Delivery positions yet.<br>Set paper capital, then select a company from Delivery and use Paper Buy.</p>' :
+        '<p class="overview-note">Simulation only. Paper values remain separate from the real Portfolio.</p>'
+    ].join("");
+    container.querySelector("#paper-change-capital").addEventListener("click", () => {
+      showCapitalConfig = !showCapitalConfig;
+      refreshPaper();
+    });
+    container.querySelector("#paper-go-delivery").addEventListener("click", () => App.switchTo("delivery"));
+    bindCapitalConfig(container);
+  }
+
+  function openPaperBuy(ticker) {
+    pendingBuyTicker = String(ticker || "").toUpperCase();
+    pendingSellTicker = null;
+    activePaperSection = "portfolio";
+    App.switchTo("paper-trading");
+  }
+
+  function renderPaperTrading(container) {
+    paperContainer = container;
+    container.innerHTML = [
+      '<div class="module-header"><h2>Paper Trading</h2><p class="module-sub">A separate simulation workspace for testing Delivery selections. It never places an order or changes the real Portfolio.</p></div>',
+      '<div class="ticket-tabs paper-section-tabs">',
+      PAPER_SECTIONS.map(section => '<button class="ticker-chip ' +
+        (section[0] === activePaperSection ? 'active' : '') + '" data-paper-section="' +
+        section[0] + '">' + section[1] + '</button>').join(''),
+      '</div><div id="paper-section-content"></div>'
+    ].join("");
+    container.querySelectorAll("[data-paper-section]").forEach(button => {
+      button.addEventListener("click", () => {
+        activePaperSection = button.dataset.paperSection;
+        renderPaperTrading(container);
+      });
+    });
+    const content = container.querySelector("#paper-section-content");
+    if (activePaperSection === "portfolio") renderPaperPortfolio(content);
+    else if (activePaperSection === "transactions") renderPaperTransactions(content);
+    else if (activePaperSection === "performance") renderPerformanceReview(content);
+    else renderPaperSummaryScreen(content);
+  }
+
   function renderPaperPortfolio(container) {
     const state = WealthData.get();
     const summary = PaperDelivery.summary(state);
@@ -784,34 +835,18 @@ const DeliveryScreenerModule = (function () {
       ? PaperDelivery.getCurrentPrice(sellHolding.ticker, state) : null;
 
     container.innerHTML = [
-      '<div class="module-header"><h2>Paper Portfolio</h2><p class="module-sub">A simulation ledger for 1–3 month delivery-selection evaluation. It is never combined with the real Portfolio.</p></div>',
-      renderCapitalConfig(summary.config),
+      '<div class="section-head paper-section-head"><span class="section-title">Paper Portfolio</span></div>',
+      summary.config.startingCapital <= 0 ? '<p class="warn-inline">Set paper capital from Summary before recording a Paper Buy.</p>' : '',
       renderBuyForm(buyCandidate, buyPrice || {}),
       renderSellForm(sellHolding, sellPrice || {}),
-      '<div class="section-head paper-section-head"><span class="section-title">Paper Portfolio Summary</span></div>',
-      renderPaperSummary(summary),
       '<div class="section-head paper-section-head"><span class="section-title">Open Paper Holdings</span></div>',
       holdings.length ? [
         '<div class="table-wrap"><table><thead><tr><th>Ticker</th><th>Quantity</th><th>Average Cost</th><th>Current Paper Price</th><th>Current Value</th><th>Unrealised G/L</th><th>Entry Date</th><th>Days</th><th>Latest Rating</th><th>Entry Rating</th><th>Entry Technical</th><th>Actions</th></tr></thead><tbody>',
         holdingRows(holdings),
         '</tbody></table></div>',
         '<div class="card-list">', holdingCards(holdings), '</div>'
-      ].join("") : '<p class="overview-empty">No open paper holdings. Use Paper Buy from the Screener after setting paper capital.</p>'
+      ].join("") : '<p class="overview-empty">No Paper Delivery positions yet.<br>Set paper capital, then select a company from Delivery and use Paper Buy.</p>'
     ].join("");
-
-    container.querySelector("#paper-save-config").addEventListener("click", async () => {
-      const input = {
-        startingCapital: Number(container.querySelector("#paper-starting-capital").value),
-        maxAllocationPct: Number(container.querySelector("#paper-max-allocation").value),
-        maxOpenHoldings: Number(container.querySelector("#paper-max-open").value)
-      };
-      const error = PaperDelivery.validateConfig(input);
-      if (error) { App.showStatus(error, "error"); return; }
-      WealthData.updatePaperDeliveryConfig(input);
-      await App.saveNow(false);
-      App.showStatus("Paper capital settings saved", "ok");
-      refreshPaper();
-    });
 
     const cancelBuy = container.querySelector("#paper-cancel-buy");
     if (cancelBuy) cancelBuy.addEventListener("click", () => {
@@ -1105,5 +1140,5 @@ const DeliveryScreenerModule = (function () {
     ].join("");
   }
 
-  return { render, computeCandidate, businessQualityPillar, financialStrengthPillar, valuationPillar, technicalTrendPillar, riskPillar, computeOverall, computeRating };
+  return { render, renderPaperTrading, openPaperBuy, computeCandidate, businessQualityPillar, financialStrengthPillar, valuationPillar, technicalTrendPillar, riskPillar, computeOverall, computeRating };
 })();

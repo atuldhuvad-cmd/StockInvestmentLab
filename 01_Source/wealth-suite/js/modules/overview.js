@@ -106,8 +106,8 @@ const OverviewModule = (function () {
     return `<div class="ratio-cell"><div class="ratio-label">${escapeHtml(label)}</div><div class="ratio-value ${className}">${escapeHtml(value)}</div></div>`;
   }
 
-  function section(title, content) {
-    return `<section class="overview-section"><div class="section-head"><span class="section-title">${escapeHtml(title)}</span></div>${content}</section>`;
+  function section(title, content, attributes = "") {
+    return `<section class="overview-section" ${attributes}><div class="section-head"><span class="section-title">${escapeHtml(title)}</span></div>${content}</section>`;
   }
 
   function render(container) {
@@ -132,8 +132,10 @@ const OverviewModule = (function () {
           ${metric("Unrealised Gain/Loss", fmtINR(model.paperDelivery.unrealisedGain), model.paperDelivery.unrealisedGain < 0 ? "overview-loss" : "overview-gain")}
           ${metric("Realised Gain/Loss", fmtINR(model.paperDelivery.realisedGain), model.paperDelivery.realisedGain < 0 ? "overview-loss" : "overview-gain")}
           ${metric("Latest Paper Transaction", model.paperDelivery.latestTransaction ? fmtDate(model.paperDelivery.latestTransaction.transactionDate) : "—")}
-        </div><p class="overview-note">Simulation only. Paper values are not included in real Portfolio wealth.</p>`
-      : `<p class="overview-empty">No Paper Delivery positions yet. Set paper capital in Delivery to begin a separate simulation.</p>`;
+        </div><p class="overview-note">Simulation only. Paper values are not included in real Portfolio wealth.</p>
+        <button class="btn overview-paper-action" data-open-paper-trading>Open Paper Trading</button>`
+      : `<p class="overview-empty">No Paper Delivery positions yet.<br>Set paper capital, then select a company from Delivery and use Paper Buy.</p>
+         <button class="btn overview-paper-action" data-open-paper-trading>Open Paper Trading</button>`;
 
     const watchlistCategories = Object.entries(model.watchlist.counts)
       .sort(([a], [b]) => a.localeCompare(b))
@@ -179,13 +181,22 @@ const OverviewModule = (function () {
       </div>
       <div class="overview-grid">
         ${section("Portfolio", portfolio)}
-        ${section("Paper Delivery Portfolio", paperDelivery)}
+        ${section("Paper Delivery Portfolio", paperDelivery, 'data-paper-trading-card role="button" tabindex="0"')}
         ${section("Watchlist", watchlist)}
         ${section("Delivery", delivery)}
         ${section("Fundamentals", fundamentals)}
         ${section("Data & Backup Health", dataHealth + healthNotes)}
       </div>
     `;
+    const paperCard = container.querySelector("[data-paper-trading-card]");
+    const openPaperTrading = () => App.switchTo("paper-trading");
+    paperCard.addEventListener("click", openPaperTrading);
+    paperCard.addEventListener("keydown", event => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openPaperTrading();
+      }
+    });
   }
 
   return { render, buildViewModel, getBackupStatus };

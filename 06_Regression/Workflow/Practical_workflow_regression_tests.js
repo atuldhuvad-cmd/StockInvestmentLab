@@ -84,17 +84,27 @@ assertExact("Legacy Watchlist Research label remains Needs Study", model.watchli
 assertExact("Paper current value remains separate", model.paperDelivery.currentValue, 120);
 assertExact("Real Portfolio total excludes Paper value", model.portfolio.totalValue, 240);
 
-const container = { innerHTML: "" };
+const boundEvents = [];
+const container = {
+  innerHTML: "",
+  querySelector: selector => ({
+    addEventListener: event => boundEvents.push(selector + ":" + event)
+  })
+};
 OverviewModule.render(container);
 assertExact("Practical health section is visible", container.innerHTML.includes("Data &amp; Backup Health"), true);
 assertExact("Developer schema status is absent", container.innerHTML.includes("Schema version"), false);
 assertExact("Macro section is absent from Overview", container.innerHTML.includes("<span class=\"section-title\">Macro</span>"), false);
 assertExact("Paper Delivery Overview section is visible", container.innerHTML.includes("Paper Delivery Portfolio"), true);
+assertExact("Overview Paper Trading action is visible", container.innerHTML.includes("Open Paper Trading"), true);
+assertExact("Overview Paper Trading card is clickable", boundEvents.includes("[data-paper-trading-card]:click"), true);
 
 const indexSource = fs.readFileSync(path.join(suiteRoot, "index.html"), "utf8");
 assertExact("Macro script is absent from active entry point", indexSource.includes('js/modules/macro.js'), false);
 assertExact("Macro registration is absent from active entry point", indexSource.includes('App.registerModule("macro"'), false);
-assertExact("Exactly five active modules are registered", (indexSource.match(/App\.registerModule\(/g) || []).length, 5);
+assertExact("Exactly six active modules are registered", (indexSource.match(/App\.registerModule\(/g) || []).length, 6);
+assertExact("Paper Trading is a top-level module", indexSource.includes('App.registerModule("paper-trading", "Paper Trading"'), true);
+assertExact("Paper Trading script is active", indexSource.includes('js/modules/paper-trading.js'), true);
 
 console.log(`\n=== SUMMARY: ${passed} passed, ${failed} failed ===`);
 process.exit(failed ? 1 : 0);
