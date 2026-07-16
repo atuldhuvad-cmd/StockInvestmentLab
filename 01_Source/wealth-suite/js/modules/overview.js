@@ -81,9 +81,11 @@ const OverviewModule = (function () {
     const completeTechnicalCount = deliveryCandidates.filter(item => item.technical && item.technical.available).length;
     const waitingTechnicalCount = Math.max(0, deliveryCandidates.length - completeTechnicalCount);
     const lastBackupAt = state.meta && state.meta.lastBackupAt ? state.meta.lastBackupAt : null;
+    const paperDelivery = PaperDelivery.summary(state);
 
     return {
       portfolio: { count: includedHoldings.length, realisedGain, ...portfolioSummary },
+      paperDelivery,
       watchlist: { total: WealthData.getWatchlist().length, counts: watchlistCounts },
       delivery: { available: deliveryCandidates.length, top: deliveryCandidates.slice(0, 3) },
       fundamentals: { companyCount: fundamentals.length, latestFiscalYear },
@@ -121,6 +123,17 @@ const OverviewModule = (function () {
           ${metric("Included holdings", String(model.portfolio.count))}
         </div>`
       : `<p class="overview-empty">No portfolio holdings entered.</p>`;
+
+    const paperDelivery = model.paperDelivery.config.startingCapital > 0 || model.paperDelivery.latestTransaction
+      ? `<div class="ratio-grid overview-ratios">
+          ${metric("Paper Capital", fmtINR(model.paperDelivery.config.startingCapital))}
+          ${metric("Open Paper Holdings", String(model.paperDelivery.openHoldings))}
+          ${metric("Current Paper Value", fmtINR(model.paperDelivery.currentValue))}
+          ${metric("Unrealised Gain/Loss", fmtINR(model.paperDelivery.unrealisedGain), model.paperDelivery.unrealisedGain < 0 ? "overview-loss" : "overview-gain")}
+          ${metric("Realised Gain/Loss", fmtINR(model.paperDelivery.realisedGain), model.paperDelivery.realisedGain < 0 ? "overview-loss" : "overview-gain")}
+          ${metric("Latest Paper Transaction", model.paperDelivery.latestTransaction ? fmtDate(model.paperDelivery.latestTransaction.transactionDate) : "—")}
+        </div><p class="overview-note">Simulation only. Paper values are not included in real Portfolio wealth.</p>`
+      : `<p class="overview-empty">No Paper Delivery positions yet. Set paper capital in Delivery to begin a separate simulation.</p>`;
 
     const watchlistCategories = Object.entries(model.watchlist.counts)
       .sort(([a], [b]) => a.localeCompare(b))
@@ -166,6 +179,7 @@ const OverviewModule = (function () {
       </div>
       <div class="overview-grid">
         ${section("Portfolio", portfolio)}
+        ${section("Paper Delivery Portfolio", paperDelivery)}
         ${section("Watchlist", watchlist)}
         ${section("Delivery", delivery)}
         ${section("Fundamentals", fundamentals)}

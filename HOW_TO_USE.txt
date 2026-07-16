@@ -1,4 +1,4 @@
-PERSONAL DELIVERY INVESTMENT AND PORTFOLIO MANAGEMENT PLATFORM v1.5
+PERSONAL DELIVERY INVESTMENT AND PORTFOLIO MANAGEMENT PLATFORM v1.6
 ============================================================
 
 OPEN THE APPLICATION
@@ -11,6 +11,8 @@ RECOMMENDED DAILY WORKFLOW
 2. Record dated Portfolio BUY and SELL transactions when they occur.
 3. Review Watchlist and Delivery candidates.
    In Delivery, import an offline OHLCV CSV when you want Technical Trend.
+   Use Delivery Paper Trading to test a selection for 1–3 months before
+   deciding whether to use real money.
 4. Review company history and ratios in Fundamentals.
 5. Click Save, then export a backup regularly.
 
@@ -72,3 +74,32 @@ IndexedDB and are included in normal JSON backups.
 
 Technical Trend is entry guidance only. Strong Trend is not an automatic buy
 signal or investment advice.
+
+DELIVERY PAPER TRADING
+Delivery contains four sub-tabs: Screener, Paper Portfolio, Paper Transactions,
+and Performance Review. Paper records are simulations and never enter the real
+Portfolio transaction ledger or real wealth totals.
+
+Before the first Paper Buy, open Paper Portfolio and set Starting Paper Capital,
+the maximum allocation per stock, and the maximum number of open holdings. Zero
+capital intentionally blocks Paper Buy. From Screener, choose Paper Buy on a
+company, confirm the dated price and quantity, optionally enter charges, notes,
+and a reason, then save. The BUY keeps a historical snapshot of the Delivery
+scores, rating, Technical status, data date, and reason so later model changes
+cannot rewrite what was known at entry.
+
+For Paper Sell, open Paper Portfolio and choose Paper Sell on the holding. Enter
+a valid non-future sale date, quantity, price, and optional charges or exit
+notes. Partial and full sales preserve realised results and transaction history.
+Delete is only for correcting a bad record; it is never treated as a sale.
+
+Paper prices use the latest close from an offline imported OHLCV file and show
+its date clearly. This is historical data, not a live quote. If no imported
+price exists, enter a Manual paper price with a mandatory date. Never enter an
+invented price.
+
+After 1–3 months, use Performance Review for realised/unrealised results,
+drawdown, holding periods, entry-rating groups, Technical-status groups, and
+30/60/90-day observations where enough price history exists. Small samples are
+descriptive only. Paper performance is model evaluation, not investment advice,
+and does not guarantee future returns.

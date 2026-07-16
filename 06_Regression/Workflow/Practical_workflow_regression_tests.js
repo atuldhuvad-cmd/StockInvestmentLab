@@ -18,6 +18,7 @@ function load(relativePath, globalName) {
 }
 
 load("js/data-model.js", "WealthData");
+load("js/paper-delivery.js", "PaperDelivery");
 global.PortfolioModule = {
   computeRow: holding => ({ ...holding, value: holding.quantity * holding.currentPrice, invested: holding.quantity * holding.avgCost, gain: holding.quantity * (holding.currentPrice - holding.avgCost) }),
   computeSummary: rows => ({
@@ -54,6 +55,15 @@ WealthData.replaceAll({
     { id: 1, ticker: "AAA", type: "BUY", transactionDate: "2026-06-01", createdAt: "2026-06-01T10:00:00Z" },
     { id: 2, ticker: "AAA", type: "SELL", transactionDate: "2026-07-10", createdAt: "2026-07-11T10:00:00Z", realisedGain: 20 }
   ],
+  paperDeliveryTransactions: [
+    { id: 11, ticker: "BBB", transactionType: "BUY", transactionDate: "2026-07-01", quantity: 2, price: 50, charges: 0, createdAt: "2026-07-01T10:00:00Z" }
+  ],
+  paperDeliveryConfig: {
+    startingCapital: 1000,
+    maxAllocationPct: 20,
+    maxOpenHoldings: 5,
+    manualPrices: { BBB: { price: 60, date: "2026-07-14" } }
+  },
   watchlist: [{ id: 1, ticker: "BBB", category: "Research" }],
   priceHistory: {
     AAA: { rows: [{ date: "2026-07-12" }, { date: "2026-07-14" }] }
@@ -71,12 +81,15 @@ assertExact("Complete Technical Trend company count", model.dataHealth.completeT
 assertExact("Waiting price-history company count", model.dataHealth.waitingTechnicalCount, 1);
 assertExact("Latest Fundamentals fiscal year", model.dataHealth.latestFiscalYear, 2026);
 assertExact("Legacy Watchlist Research label remains Needs Study", model.watchlist.counts["Needs Study"], 1);
+assertExact("Paper current value remains separate", model.paperDelivery.currentValue, 120);
+assertExact("Real Portfolio total excludes Paper value", model.portfolio.totalValue, 240);
 
 const container = { innerHTML: "" };
 OverviewModule.render(container);
 assertExact("Practical health section is visible", container.innerHTML.includes("Data &amp; Backup Health"), true);
 assertExact("Developer schema status is absent", container.innerHTML.includes("Schema version"), false);
 assertExact("Macro section is absent from Overview", container.innerHTML.includes("<span class=\"section-title\">Macro</span>"), false);
+assertExact("Paper Delivery Overview section is visible", container.innerHTML.includes("Paper Delivery Portfolio"), true);
 
 const indexSource = fs.readFileSync(path.join(suiteRoot, "index.html"), "utf8");
 assertExact("Macro script is absent from active entry point", indexSource.includes('js/modules/macro.js'), false);

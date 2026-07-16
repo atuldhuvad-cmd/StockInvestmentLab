@@ -8,11 +8,17 @@ A verified **Personal Delivery Investment and Portfolio Management Platform**
 (`01_Source\wealth-suite`), built in pure HTML/CSS/JS with IndexedDB persistence,
 alongside formal, evidence-based verification history.
 
-## Active application (wealth-suite-v1.5)
+## Active application (wealth-suite-v1.6)
 
 The focused platform has five active navigation modules, in this order:
 Overview, Portfolio, Watchlist, Delivery, and Fundamentals. Overview opens by
 default.
+
+Delivery includes an isolated Paper Delivery facility with Screener, Paper
+Portfolio, Paper Transactions, and Performance Review sub-tabs. Paper capital,
+transactions, holdings, realised results, and entry-score snapshots remain
+separate from the real Portfolio. Offline imported closes are always shown with
+their dates and are never described as live prices.
 
 Core workflow: Overview → Portfolio → Watchlist → Delivery Screener →
 Fundamentals.

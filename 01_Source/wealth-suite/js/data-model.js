@@ -54,6 +54,20 @@ const WealthData = (function () {
         //   transactionDate?, costBasisPerUnit?, realisedGain?, createdAt? }
       ],
 
+      // Delivery paper trading is completely separate from the real
+      // Portfolio ledger. Older v1.5 backups omit both fields and receive
+      // safe empty/default values through replaceAll().
+      paperDeliveryTransactions: [
+        // { id, ticker, transactionType: 'BUY'|'SELL', transactionDate,
+        //   quantity, price, charges, notes, createdAt, entrySnapshot? }
+      ],
+      paperDeliveryConfig: {
+        startingCapital: 0,
+        maxAllocationPct: 20,
+        maxOpenHoldings: 10,
+        manualPrices: {}
+      },
+
       // watchlist: stocks under consideration, separate from actual holdings
       // (approved refinement — this table did not exist in the original plan)
       watchlist: [
@@ -129,6 +143,15 @@ const WealthData = (function () {
     getFundamentals: (ticker) => state.fundamentals[ticker],
     getHoldings: () => state.holdings,
     getPortfolioTransactions: () => Array.isArray(state.portfolioTransactions) ? state.portfolioTransactions : [],
+    getPaperDeliveryTransactions: () => Array.isArray(state.paperDeliveryTransactions) ? state.paperDeliveryTransactions : [],
+    getPaperDeliveryConfig: () => ({
+      startingCapital: 0,
+      maxAllocationPct: 20,
+      maxOpenHoldings: 10,
+      ...(state.paperDeliveryConfig && typeof state.paperDeliveryConfig === "object" ? state.paperDeliveryConfig : {}),
+      manualPrices: state.paperDeliveryConfig && state.paperDeliveryConfig.manualPrices && typeof state.paperDeliveryConfig.manualPrices === "object"
+        ? state.paperDeliveryConfig.manualPrices : {}
+    }),
     getWatchlist: () => state.watchlist,
     getResearchLibrary: () => state.researchLibrary,
     getSetting: (key) => state.settings[key],
@@ -157,6 +180,20 @@ const WealthData = (function () {
       state.portfolioTransactions.push(transaction);
       state.meta = { ...state.meta, schemaVersion: Math.max(Number(state.meta && state.meta.schemaVersion) || 0, 3) };
       return transaction.id;
+    },
+    addPaperDeliveryTransaction(transaction) {
+      if (!Array.isArray(state.paperDeliveryTransactions)) state.paperDeliveryTransactions = [];
+      state.paperDeliveryTransactions.push(transaction);
+      return transaction.id;
+    },
+    removePaperDeliveryTransaction(id) {
+      state.paperDeliveryTransactions = (Array.isArray(state.paperDeliveryTransactions) ? state.paperDeliveryTransactions : [])
+        .filter(transaction => transaction.id !== id);
+    },
+    updatePaperDeliveryConfig(updates) {
+      const current = state.paperDeliveryConfig && typeof state.paperDeliveryConfig === "object"
+        ? state.paperDeliveryConfig : {};
+      state.paperDeliveryConfig = { ...current, ...updates };
     },
     addWatchlistItem(item) {
       const id = Date.now() + Math.random();
