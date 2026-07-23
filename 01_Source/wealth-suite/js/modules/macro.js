@@ -43,9 +43,15 @@ const MacroModule = (function () {
     INDICATORS.forEach(ind => {
       const value = json[ind.jsonField];
       if (value === undefined || value === null) return;
+      // MAC-D01 fix (2026-07-23): parse first and skip non-numeric input. A
+      // present-but-non-numeric field (e.g. "N/A") used to be stored and
+      // counted as NaN, which rendered the literal "NaN" in the UI. Valid 0 is
+      // unaffected (parseFloat(0) === 0, not NaN). See Macro_Verification_Report.md.
+      const num = parseFloat(value);
+      if (Number.isNaN(num)) return;
       const series = WealthData.get().macroIndicators[ind.key] || (WealthData.get().macroIndicators[ind.key] = []);
       const existingIdx = series.findIndex(p => p.date === date);
-      const point = { date, value: parseFloat(value), source: "import" };
+      const point = { date, value: num, source: "import" };
       if (existingIdx >= 0) series[existingIdx] = point; else series.push(point);
       count++;
     });
@@ -117,5 +123,5 @@ const MacroModule = (function () {
     }
   }
 
-  return { render, importSnapshot };
+  return { render, importSnapshot, latestTwo };
 })();
