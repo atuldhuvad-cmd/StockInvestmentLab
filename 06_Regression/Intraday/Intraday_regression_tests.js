@@ -25,11 +25,11 @@ function assertExact(label, actual, expected) {
   return pass;
 }
 
-eval(fs.readFileSync(path.join(__dirname,'js/data-model.js'),'utf8') + '\nglobal.WealthData = WealthData;');
+eval(fs.readFileSync(path.join(__dirname,'..','..','01_Source','wealth-suite','js/data-model.js'),'utf8') + '\nglobal.WealthData = WealthData;');
 global.document = {};
 global.App = { showStatus: ()=>{}, saveNow: ()=>{} };
-eval(fs.readFileSync(path.join(__dirname,'js/modules/portfolio.js'),'utf8') + '\nglobal.PortfolioModule = PortfolioModule;');
-eval(fs.readFileSync(path.join(__dirname,'js/modules/intraday.js'),'utf8') + '\nglobal.IntradayModule = IntradayModule;');
+eval(fs.readFileSync(path.join(__dirname,'..','..','01_Source','wealth-suite','js/modules/portfolio.js'),'utf8') + '\nglobal.PortfolioModule = PortfolioModule;');
+eval(fs.readFileSync(path.join(__dirname,'..','..','01_Source','wealth-suite','js/modules/intraday.js'),'utf8') + '\nglobal.IntradayModule = IntradayModule;');
 
 console.log("=== IN-01: Risk-Reward Ratio — independently derived ===");
 const c1 = IntradayModule.computeChecklist({ entryPrice:100, stopLoss:95, target:115, notes:"breakout" });

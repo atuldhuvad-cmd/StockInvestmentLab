@@ -47,12 +47,12 @@ function interp(value, points) {
   }
 }
 
-eval(fs.readFileSync(path.join(__dirname,'js/data-model.js'),'utf8') + '\nglobal.WealthData = WealthData;');
-eval(fs.readFileSync(path.join(__dirname,'js/company-calculations.js'),'utf8') + '\nglobal.CompanyCalculations = CompanyCalculations;');
-eval(fs.readFileSync(path.join(__dirname,'js/price-history.js'),'utf8') + '\nglobal.PriceHistory = PriceHistory;');
+eval(fs.readFileSync(path.join(__dirname,'..','..','01_Source','wealth-suite','js/data-model.js'),'utf8') + '\nglobal.WealthData = WealthData;');
+eval(fs.readFileSync(path.join(__dirname,'..','..','01_Source','wealth-suite','js/company-calculations.js'),'utf8') + '\nglobal.CompanyCalculations = CompanyCalculations;');
+eval(fs.readFileSync(path.join(__dirname,'..','..','01_Source','wealth-suite','js/price-history.js'),'utf8') + '\nglobal.PriceHistory = PriceHistory;');
 global.document = {};
-eval(fs.readFileSync(path.join(__dirname,'js/modules/delivery-screener.js'),'utf8') + '\nglobal.DeliveryScreenerModule = DeliveryScreenerModule;');
-eval(fs.readFileSync(path.join(__dirname,'js/seed-data.js'),'utf8') + '\nglobal.SEED_FUNDAMENTALS = SEED_FUNDAMENTALS;');
+eval(fs.readFileSync(path.join(__dirname,'..','..','01_Source','wealth-suite','js/modules/delivery-screener.js'),'utf8') + '\nglobal.DeliveryScreenerModule = DeliveryScreenerModule;');
+eval(fs.readFileSync(path.join(__dirname,'..','..','01_Source','wealth-suite','js/seed-data.js'),'utf8') + '\nglobal.SEED_FUNDAMENTALS = SEED_FUNDAMENTALS;');
 
 Object.entries(SEED_FUNDAMENTALS).forEach(([ticker, company]) => {
   WealthData.upsertSecurity(ticker, { displayName: company.name, sector: company.sector, isBank: company.isBank });

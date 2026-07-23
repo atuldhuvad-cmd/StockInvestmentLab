@@ -1,7 +1,11 @@
 const fs = require('fs');
-eval(fs.readFileSync('js/data-model.js', 'utf8') + '\nglobal.WealthData = WealthData;');
+const path = require('path');
+// PROJ-D01b fix (2026-07-23): resolve source relative to this file, not cwd,
+// so the suite runs from any working directory (was cwd-relative 'js/...').
+const suiteRoot = path.resolve(__dirname, '..', '..', '01_Source', 'wealth-suite');
+eval(fs.readFileSync(path.join(suiteRoot, 'js/data-model.js'), 'utf8') + '\nglobal.WealthData = WealthData;');
 global.document = {};
-eval(fs.readFileSync('js/modules/portfolio.js', 'utf8') + '\nglobal.PortfolioModule = PortfolioModule;');
+eval(fs.readFileSync(path.join(suiteRoot, 'js/modules/portfolio.js'), 'utf8') + '\nglobal.PortfolioModule = PortfolioModule;');
 
 function testCase(id, holding, security, expected) {
   if (security) WealthData.upsertSecurity(holding.ticker, security);
