@@ -56,7 +56,7 @@ verified; neither module is loaded or registered in the active application.
 | Intraday | Frozen; inactive in Wealth Suite UI | v1.0 |
 | Research | Frozen; inactive in Wealth Suite UI | v1.0 |
 | Macro | **Frozen 2026-07-23 (v1.0)**; inactive in Wealth Suite UI; legacy data preserved | v1.0 |
-| Watchlist | Pending | v0.0 |
+| Watchlist | **Frozen 2026-07-23 (v1.0)** | v1.0 |
 | Persistence | Pending | v0.0 |
 | Settings | Inactive in Wealth Suite UI | v0.0 |
 

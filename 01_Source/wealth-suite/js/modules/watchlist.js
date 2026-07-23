@@ -24,6 +24,25 @@ const WatchlistModule = (function () {
     return category ? category.label : value;
   }
 
+  // Pure: normalize raw form input into a watchlist item (no id/dateAdded —
+  // those are assigned by WealthData.addWatchlistItem). Returns null if the
+  // ticker is empty, so the caller can show the "Enter a ticker first" error.
+  function buildItem(raw) {
+    const ticker = (raw.ticker || "").trim().toUpperCase();
+    if (!ticker) return null;
+    return {
+      ticker,
+      category: raw.category,
+      targetPrice: parseFloat(raw.targetPrice) || null,
+      notes: (raw.notes || "").trim()
+    };
+  }
+
+  // Pure: newest-first by dateAdded, on a copy (never mutates the stored array).
+  function sortByDateAdded(items) {
+    return items.slice().sort((a, b) => new Date(b.dateAdded) - new Date(a.dateAdded));
+  }
+
   function render(container) {
     container.innerHTML = `
       <div class="module-header">
@@ -55,14 +74,14 @@ const WatchlistModule = (function () {
     `;
 
     container.querySelector("#wl-add").addEventListener("click", () => {
-      const ticker = container.querySelector("#wl-ticker").value.trim().toUpperCase();
-      if (!ticker) { App.showStatus("Enter a ticker first", "error"); return; }
-      WealthData.addWatchlistItem({
-        ticker,
-        category: container.querySelector("#wl-category").value,
-        targetPrice: parseFloat(container.querySelector("#wl-target").value) || null,
-        notes: container.querySelector("#wl-notes").value.trim()
+      const item = buildItem({
+        ticker:      container.querySelector("#wl-ticker").value,
+        category:    container.querySelector("#wl-category").value,
+        targetPrice: container.querySelector("#wl-target").value,
+        notes:       container.querySelector("#wl-notes").value
       });
+      if (!item) { App.showStatus("Enter a ticker first", "error"); return; }
+      WealthData.addWatchlistItem(item);
       container.querySelector("#wl-ticker").value = "";
       container.querySelector("#wl-target").value = "";
       container.querySelector("#wl-notes").value = "";
@@ -74,7 +93,7 @@ const WatchlistModule = (function () {
   }
 
   function renderList(container) {
-    const items = WealthData.getWatchlist().slice().sort((a, b) => new Date(b.dateAdded) - new Date(a.dateAdded));
+    const items = sortByDateAdded(WealthData.getWatchlist());
     container.querySelector("#wl-count").textContent = `${items.length} ${items.length === 1 ? "stock" : "stocks"}`;
 
     // Desktop table — full detail, every column visible at once (this is the
@@ -116,5 +135,5 @@ const WatchlistModule = (function () {
     });
   }
 
-  return { render };
+  return { render, categoryLabel, buildItem, sortByDateAdded };
 })();
