@@ -174,4 +174,13 @@ class PublicSyncTests(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main(verbosity=2)
+    result = unittest.main(verbosity=2, exit=False)
+    guide_updated = False
+    if result.result.wasSuccessful():
+        try:
+            import generate_pdf_user_guide
+            generate_pdf_user_guide.generate_markdown_and_html_guide()
+            guide_updated = True
+        except Exception as e:
+            print(f"User guide update failed: {e}", file=sys.stderr)
+    sys.exit(0 if result.result.wasSuccessful() and guide_updated else 1)

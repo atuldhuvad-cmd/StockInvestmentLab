@@ -39,6 +39,7 @@ paper-delivery-transactions-*.csv
 !/scripts/
 /scripts/*
 !/scripts/fetch_public_prices.py
+!/scripts/generate_pdf_user_guide.py
 !/scripts/validate_market_data.py
 !/scripts/serve_wealth_suite.py
 !/scripts/test_public_sync_system.py
