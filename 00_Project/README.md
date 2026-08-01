@@ -57,10 +57,10 @@ verified; neither module is loaded or registered in the active application.
 | Research | Frozen; inactive in Wealth Suite UI | v1.0 |
 | Macro | **Frozen 2026-07-23 (v1.0)**; inactive in Wealth Suite UI; legacy data preserved | v1.0 |
 | Watchlist | **Frozen 2026-07-23 (v1.0)** | v1.0 |
-| Persistence | Pending | v0.0 |
-| Settings | Inactive in Wealth Suite UI | v0.0 |
+| Persistence | **Frozen 2026-07-23 (v1.0)** — PER-D01 fixed (import silent-wipe), PER-D02 recorded | v1.0 |
+| Settings | **Frozen 2026-08-01 (v1.0)**; inactive compatibility module | v1.0 |
 
-Regression: **91/91 PASS**, confirmed by real execution. First 59 (Portfolio/Fundamentals/Delivery Screener/Intraday) per `07_Session Reports\Session_Report_Laptop_Migration.md`; the additional 32 (Research) confirmed in this same working session — see `05_Modules\Research\Research_Verification_Report.md`.
+Regression: **16/16 central suites PASS with 0 failures**, confirmed by real execution on 2026-08-01. See `07_Session Reports\Release_v1.8_Final_Verification.md` for the consolidated baseline.
 
 > ℹ️ **Update 2026-07-23 (PROJ-D01, now RESOLVED).** The "91/91 PASS" line above was found to be temporarily **unverifiable**: the Delivery Screener (15) and Intraday (18) harnesses — 33 of the 91 tests — crashed on load with `ENOENT` from any working directory (source path `__dirname`-anchored, missing the `01_Source\wealth-suite` hop). This was **a test-harness defect, not a product regression** — the Delivery/Intraday logic passed 15/15 and 18/18 once the path was corrected. **Fixed the same day** and re-verified in-repo from the repository root (cwd-independent): all committed suites now execute and pass, 0 failures. Note the original "91" was itself a freeze-time snapshot — the suite set has since grown (Fundamentals now 43, Research now 46, plus paper-trading/price-history/workflow suites and Macro 38), so the live executed count is higher. A milder related residual — **PROJ-D01b**, `Portfolio_regression_tests.js` using a cwd-relative loader — was **also fixed the same day**, so **all 21 committed regression suites now execute and pass from any working directory (0 failures)**, and the "runnable independently" description of `06_Regression` (below) is fully true again. Full record: `06_Regression\PROJ-D01_Regression_Harness_Path_Defect.md`.
 

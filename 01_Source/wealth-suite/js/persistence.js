@@ -22,6 +22,17 @@ const Persistence = (function () {
   const STORE_NAME = "appState";
   const RECORD_KEY = "main"; // single-user, single-document — one fixed key, always
 
+  // Recognized top-level sections of a WealthData backup. Used by importFromFile
+  // to tell a real backup apart from arbitrary JSON (PER-D01 fix). A genuine
+  // backup — including an older one missing newer fields — always carries at
+  // least one of these; {}, arrays, and unrelated objects carry none.
+  const BACKUP_KEYS = [
+    "securities", "fundamentals", "holdings", "portfolioTransactions",
+    "paperDeliveryTransactions", "paperDeliveryConfig", "watchlist",
+    "researchLibrary", "intradayTrades", "macroIndicators", "settings",
+    "priceCache", "priceHistory", "meta"
+  ];
+
   let dbPromise = null;
 
   function openDB() {
@@ -111,10 +122,15 @@ const Persistence = (function () {
       reader.onload = async (e) => {
         try {
           const parsed = JSON.parse(e.target.result);
-          // Basic sanity check before trusting an imported file wholesale —
-          // an empty or malformed file should not silently wipe real data.
-          if (typeof parsed !== "object" || parsed === null) {
-            throw new Error("File does not contain a valid JSON object.");
+          // PER-D01 fix (2026-07-23): the earlier check only confirmed "is an
+          // object", so {}, arrays, and any wrong-shape object passed and were
+          // then merged onto emptyState() by replaceAll() — silently wiping
+          // real data, the exact outcome this guard is meant to prevent. Now
+          // require the file to look like a Wealth Intelligence backup: a plain
+          // object (not an array) carrying at least one recognized section.
+          if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)
+              || !BACKUP_KEYS.some(k => k in parsed)) {
+            throw new Error("File does not look like a Wealth Intelligence backup.");
           }
           WealthData.replaceAll(parsed);
           await save();

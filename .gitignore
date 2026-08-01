@@ -30,4 +30,6 @@ paper-delivery-transactions-*.csv
 
 09_Backups/CAS/
 
-09_Backups/CAS/
+# Separate local workspace projects and personal utility scripts
+/Life Vault/
+/scripts/
