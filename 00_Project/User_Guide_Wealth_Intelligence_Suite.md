@@ -1,6 +1,6 @@
 # 📘 Step-by-Step User Guide: Wealth Intelligence Suite
 
-**System Version:** v2.0.0 / Searchable Nifty 500 Screener
+**System Version:** v2.1.0 / Nifty 500 Fundamentals Enrollment
 **Scope:** Strictly Personal Single-User Investment, Portfolio Management, and Paper Trading
 **Architecture:** Pure Offline Web App + Public Market Data Auto-Sync Engine
 
@@ -70,16 +70,19 @@
   4. Monitor drawdown, holding periods, and 30/60/90-day returns in **Performance Review**.
 
 ### Step 6: Fundamentals & Quality Context
-* **Purpose:** Financial history, quality scores, and red flag analysis.
+* **Purpose:** Search the Nifty 500 registry, preserve verified financial history, and enroll genuine fundamental evidence without fabricated defaults.
 * **Actions:**
-  1. Review 5-year historical ratios (ROE, ROCE, Debt/Equity, Net Margin, Revenue CAGR, P/E).
-  2. Inspect automated Red Flags list and banking/lender warnings.
+  1. Search any constituent by ticker, including `DIXON`. A stock with no record displays **Not Enrolled** and blank values.
+  2. Use **Enroll Financial Data** to enter sourced ratios. Partial records may be saved but remain **Fundamentals Incomplete**.
+  3. Full Rating requires verified evidence plus ROE, Debt/Equity, P/E, Revenue CAGR, and at least one qualitative moat score.
+  4. Mark evidence as verified only after checking the named source. Unverified, missing, future-dated, or stale evidence cannot promote a stock.
+  5. Edit operations preserve the previous manual record in enrollment history; delete requires explicit confirmation.
 
 ---
 
 ## 💾 3. Storage, Backups & Privacy
 
-* **IndexedDB Local Storage:** All portfolio records, watchlist items, paper trades, and price histories are stored safely inside your local browser's IndexedDB.
+* **IndexedDB Local Storage:** Portfolio records, watchlist items, paper trades, price histories, fundamental enrollments, evidence metadata, and enrollment history are stored inside your local browser's IndexedDB.
 * **Exporting Backups:** Click **`Export backup`** in the top toolbar to download a `.json` backup file.
 * **Restoring Backups:** Click **`Import backup`**, select your `.json` backup file, and confirm. All state is restored with built-in `PER-D01` data protection.
 

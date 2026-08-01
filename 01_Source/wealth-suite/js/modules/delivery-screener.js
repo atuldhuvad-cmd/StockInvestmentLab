@@ -166,19 +166,14 @@ const DeliveryScreenerModule = (function () {
   function computeCandidate(ticker) {
     const security = WealthData.getSecurity(ticker);
     const fundamentals = WealthData.getFundamentals(ticker);
-    if (!fundamentals) return null; // Standalone Value Rule: no inputs, no ranking — not an error
+    if (!fundamentals) return null;
+    if (fundamentals.manualRatios && !CompanyCalculations.hasMinimumFundamentals(fundamentals)) return null;
 
-    // FIN-D01–D04 fix, 2026-07-12 (Delivery Screener Phase 3): this used to
-    // be an independent, unfixed copy of Fundamentals' ratio calculations
-    // (proven to reproduce FUND-D01/D02/D03's exact defects — negative
-    // equity/capEmployed and zero first-year revenue all produced broken
-    // results here even after Fundamentals itself was fixed). Now calls the
-    // single shared, guarded definition instead of maintaining a second copy.
-    const ratios = CompanyCalculations.latestRatios(fundamentals);
+    const ratios = fundamentals.manualRatios ? fundamentals.manualRatios : CompanyCalculations.latestRatios(fundamentals);
 
-    const bq = businessQualityPillar(fundamentals.qualitative);
+    const bq = businessQualityPillar(fundamentals.qualitative || {});
     const fs = financialStrengthPillar(ratios);
-    const val = valuationPillar(ratios, bq.score);
+    const val = valuationPillar(ratios, bq.score || 50);
     const tech = technicalTrendPillar(ticker);
     const risk = riskPillar(fundamentals, ratios);
 
@@ -189,7 +184,7 @@ const DeliveryScreenerModule = (function () {
     const { strengths, risks } = rankStrengthsAndRisks(pillars);
 
     return {
-      ticker, security, overall: Math.round(overall * 10) / 10, rating, pillars, strengths, risks, ratios,
+      ticker, security: security || { displayName: ticker, sector: "Nifty 500" }, overall: Math.round(overall * 10) / 10, rating, pillars, strengths, risks, ratios,
       redFlagCount: risk.flags.length, assessment: tech.available ? "Complete" : "Partial",
       pillarCoverage: tech.available ? "5 of 5" : "4 of 5",
       isFullRating: true

@@ -169,6 +169,9 @@ const WealthData = (function () {
     upsertFundamentals(ticker, data) {
       state.fundamentals[ticker] = data;
     },
+    deleteFundamentals(ticker) {
+      delete state.fundamentals[ticker];
+    },
     addHolding(holding) {
       const id = Date.now() + Math.random();
       state.holdings.push({ id, ...holding });

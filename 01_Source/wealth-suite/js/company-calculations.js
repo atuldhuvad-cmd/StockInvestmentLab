@@ -68,5 +68,41 @@ const CompanyCalculations = (function () {
     return { roe, roce, debtEquity, netMargin, revenueCagr, eps, pe, fcf, latest, first, yearsSpan };
   }
 
-  return { qualityScore, detectRedFlags, latestRatios };
+  function hasMinimumFundamentals(fundamentals) {
+    if (!fundamentals) return false;
+
+    return fundamentalCoverage(fundamentals).complete;
+  }
+
+  function evidenceStatus(fundamentals) {
+    const evidence = fundamentals.evidence || {};
+    const isLegacyVerified = !fundamentals.manualRatios && Array.isArray(fundamentals.years) && fundamentals.years.length > 0 && fundamentals.source && fundamentals.fetchedAt;
+    const sourceName = String(evidence.sourceName || (isLegacyVerified ? fundamentals.source : "")).trim();
+    const evidenceDate = String(evidence.evidenceDate || (isLegacyVerified ? fundamentals.fetchedAt : "")).trim();
+    if (!sourceName || !evidenceDate) return "Missing";
+    const parsedDate = new Date(`${evidenceDate}T00:00:00`);
+    if (Number.isNaN(parsedDate.getTime()) || parsedDate > new Date()) return "Missing";
+    const ageDays = (Date.now() - parsedDate.getTime()) / 86400000;
+    if (ageDays > 550) return "Stale";
+    if (isLegacyVerified || evidence.status === "Verified") return "Verified";
+    return "User-entered/unverified";
+  }
+
+  function fundamentalCoverage(fundamentals) {
+    if (!fundamentals) return { complete: false, missing: ["ROE", "Debt/Equity", "P/E", "Revenue CAGR", "Moat rating", "Verified evidence"], evidenceStatus: "Missing" };
+    const ratios = fundamentals.manualRatios || (Array.isArray(fundamentals.years) && fundamentals.years.length ? latestRatios(fundamentals) : {});
+    const finite = value => typeof value === "number" && Number.isFinite(value);
+    const missing = [];
+    if (!finite(ratios.roe)) missing.push("ROE");
+    if (!finite(ratios.debtEquity)) missing.push("Debt/Equity");
+    if (!finite(ratios.pe)) missing.push("P/E");
+    if (!finite(ratios.revenueCagr)) missing.push("Revenue CAGR");
+    const qualitativeValues = Object.values(fundamentals.qualitative || {});
+    if (!qualitativeValues.some(value => typeof value === "number" && Number.isFinite(value) && value >= 1 && value <= 5)) missing.push("Moat rating");
+    const status = evidenceStatus(fundamentals);
+    if (status !== "Verified") missing.push("Verified evidence");
+    return { complete: missing.length === 0, missing, evidenceStatus: status };
+  }
+
+  return { qualityScore, detectRedFlags, latestRatios, hasMinimumFundamentals, fundamentalCoverage, evidenceStatus };
 })();

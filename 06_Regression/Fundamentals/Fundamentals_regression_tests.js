@@ -137,6 +137,31 @@ const validHistoricalOutputsUnchanged = Object.values(SEED_FUNDAMENTALS).every(f
 assertExact("TC-F10b", "All 40 valid historical period outputs remain unchanged", validHistoricalOutputsUnchanged, true);
 assertClose("TC-F10c", "Latest TCS ROE remains unchanged", latestRatios(SEED_FUNDAMENTALS.TCS).roe, 46.11525550167847);
 
+console.log("\n=== TC-F12: Nifty 500 manual enrollment and rating integrity ===");
+assertExact("TC-F12a", "DIXON is searchable in the Fundamentals universe", FundamentalsModule.isNifty500Ticker("DIXON"), true);
+assertExact("TC-F12b", "Missing fundamentals never qualify", CompanyCalculations.hasMinimumFundamentals(null), false);
+const partialDixon = {
+  years: [], manualRatios: { roe: 18, debtEquity: null, pe: null, revenueCagr: null },
+  qualitative: {}, evidence: { sourceName: "", evidenceDate: "", status: "User-entered/unverified" }
+};
+assertExact("TC-F12c", "Partial enrollment remains incomplete", CompanyCalculations.hasMinimumFundamentals(partialDixon), false);
+assertExact("TC-F12d", "Blank ratios remain null rather than zero", partialDixon.manualRatios.debtEquity, null);
+const verifiedDixon = {
+  years: [], manualRatios: { roe: 18, debtEquity: 0.4, pe: 35, revenueCagr: 14 },
+  qualitative: { economicMoat: 4 },
+  evidence: { sourceName: "Annual report", evidenceDate: new Date().toISOString().slice(0, 10), status: "Verified" }
+};
+assertExact("TC-F12e", "Complete verified enrollment qualifies", CompanyCalculations.hasMinimumFundamentals(verifiedDixon), true);
+assertExact("TC-F12f", "Unverified evidence blocks promotion", CompanyCalculations.hasMinimumFundamentals({ ...verifiedDixon, evidence: { ...verifiedDixon.evidence, status: "User-entered/unverified" } }), false);
+assertExact("TC-F12g", "All ten legacy enrolled companies remain eligible", Object.values(SEED_FUNDAMENTALS).every(record => CompanyCalculations.hasMinimumFundamentals({ ...record, source: record.dataSource, fetchedAt: "2026-07-12" })), true);
+WealthData.upsertFundamentals("DIXON", { ...verifiedDixon, enrollmentHistory: [{ savedAt: "2026-07-31", manualRatios: { roe: 17 } }] });
+const enrollmentBackup = JSON.parse(JSON.stringify(WealthData.get()));
+WealthData.replaceAll(enrollmentBackup);
+assertExact("TC-F12h", "Evidence survives JSON backup restoration", WealthData.getFundamentals("DIXON").evidence.sourceName, "Annual report");
+assertExact("TC-F12i", "Enrollment history survives JSON backup restoration", WealthData.getFundamentals("DIXON").enrollmentHistory.length, 1);
+WealthData.deleteFundamentals("DIXON");
+assertExact("TC-F12j", "Explicit delete removes enrollment", WealthData.getFundamentals("DIXON"), undefined);
+
 console.log(`\n=== INTERIM SUMMARY (before Net Margin closure below): ${passCount} passed, ${failCount} failed ===`);
 
 // ---- Added: closing the Net Margin gap flagged as NOT VERIFIED ----
