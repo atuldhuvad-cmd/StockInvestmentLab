@@ -114,6 +114,7 @@ const FundamentalsModule = (function () {
     "WOCKPHARMA","YESBANK","ZFCVINDIA","ZEEL","ZENTEC","ZENSARTECH","ZYDUSLIFE","ZYDUSWELL","ECLERX"
   ];
   const NIFTY_500_SET = new Set(NIFTY_500_TICKERS);
+  if (typeof globalThis !== "undefined") globalThis.NIFTY_500_TICKERS = NIFTY_500_TICKERS;
 
   function render(container) {
     seedIfEmpty();
@@ -128,22 +129,32 @@ const FundamentalsModule = (function () {
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px;background:var(--bg-ticket);padding:14px;border:1px solid var(--rule-bright);">
         <input type="text" id="fund-search-input" placeholder="🔍 Search ticker (e.g. DIXON, TCS)..." style="flex:1;min-width:200px;min-height:var(--touch);padding:0 12px;background:var(--bg-raised);border:1px solid var(--rule-bright);color:var(--paper);font-family:var(--mono);">
         <select id="fund-status-filter" style="min-height:var(--touch);padding:0 12px;background:var(--bg-raised);border:1px solid var(--rule-bright);color:var(--paper);font-family:var(--mono);">
-          <option value="all">Status: All Nifty 500 (500)</option>
-          <option value="enrolled">Enrolled (Full Rating)</option>
-          <option value="partial">Partially Enrolled</option>
-          <option value="not_enrolled">Not Enrolled</option>
+          <option value="all">Status: All Nifty 500</option>
+          <option value="missing">Missing</option>
+          <option value="partial">Partial</option>
+          <option value="unverified">User-entered / unverified</option>
+          <option value="stale">Stale</option>
+          <option value="verified">Verified (Partial)</option>
+          <option value="eligible">Eligible for Full Rating</option>
         </select>
+        <select id="fund-sort-by" style="min-height:var(--touch);padding:0 12px;background:var(--bg-raised);border:1px solid var(--rule-bright);color:var(--paper);font-family:var(--mono);">
+          <option value="ticker">Sort: Ticker (A-Z)</option>
+          <option value="status">Sort: Completion Status</option>
+        </select>
+        <button id="btn-export-csv" class="btn" style="background:var(--bg-raised);border:1px solid var(--rule-bright);color:var(--paper);">📤 Export CSV Template</button>
+        <button id="btn-import-csv" class="btn" style="background:var(--bg-raised);border:1px solid var(--rule-bright);color:var(--paper);">📥 Import CSV</button>
+        <input type="file" id="fund-import-file" accept=".csv" style="display:none">
       </div>
 
       <div class="ticket-tabs" id="fund-ticker-tabs"></div>
       <div id="fund-detail" style="margin-top:16px;"></div>
     `;
 
-    const state = { searchText: "", filterStatus: "all" };
+    const state = { searchText: "", filterStatus: "all", sortBy: "ticker" };
     let selectedTicker = null;
 
     function refreshList() {
-      const allKnown = Array.from(new Set([...Object.keys(fundamentals), ...NIFTY_500_TICKERS]));
+      const allKnown = NIFTY_500_TICKERS.slice();
 
       let filtered = allKnown.filter(t => {
         if (state.searchText) {
@@ -153,31 +164,50 @@ const FundamentalsModule = (function () {
           const matchName = (sec.displayName || "").toLowerCase().includes(query);
           if (!matchTicker && !matchName) return false;
         }
-        const record = fundamentals[t];
-        const isEnrolled = record && hasMinimumFundamentals(record);
-        const isPartial = record && !isEnrolled;
-        const isNotEnrolled = !record;
 
-        if (state.filterStatus === "enrolled") return isEnrolled;
-        if (state.filterStatus === "partial") return isPartial;
-        if (state.filterStatus === "not_enrolled") return isNotEnrolled;
+        if (state.filterStatus === "all") return true;
+
+        const record = fundamentals[t];
+        const status = CompanyCalculations.determineReviewStatus(record);
+
+        if (state.filterStatus === "missing") return status === "Missing";
+        if (state.filterStatus === "partial") return status === "Partial";
+        if (state.filterStatus === "unverified") return status === "User-entered / unverified";
+        if (state.filterStatus === "stale") return status === "Stale";
+        if (state.filterStatus === "verified") return status === "Verified";
+        if (state.filterStatus === "eligible") return status === "Eligible for Full Rating";
+
         return true;
       });
 
-      filtered.sort();
+      if (state.sortBy === "status") {
+        const getScore = (t) => {
+          const s = CompanyCalculations.determineReviewStatus(fundamentals[t]);
+          return { "Missing": 0, "Partial": 1, "User-entered / unverified": 2, "Stale": 3, "Verified": 4, "Eligible for Full Rating": 5 }[s] || 0;
+        };
+        filtered.sort((a, b) => getScore(a) - getScore(b) || a.localeCompare(b));
+      } else {
+        filtered.sort();
+      }
 
       const tabsEl = container.querySelector("#fund-ticker-tabs");
       tabsEl.innerHTML = filtered.length
         ? filtered.map(t => {
             const record = fundamentals[t];
-            const isEnrolled = record && hasMinimumFundamentals(record);
+            const isEnrolled = record && CompanyCalculations.hasMinimumFundamentals(record);
             const isPartial = record && !isEnrolled;
             const badgeClass = isEnrolled ? "sync-health-healthy" : (isPartial ? "sync-health-degraded" : "sync-health-stale");
             const badgeText = isEnrolled ? "Full Rating" : (isPartial ? "Partial" : "Not Enrolled");
+            const missing = CompanyCalculations.fundamentalCoverage(record).missing;
+            const missingText = missing.length > 0 ? `<div style="font-size:10px;color:var(--paper-dim);white-space:normal;text-align:left;line-height:1.2;margin-top:2px;">Missing: ${missing.join(", ")}</div>` : "";
+
             return `
-              <button class="ticker-chip ${t===selectedTicker?'active':''}" data-ticker="${t}" style="display:inline-flex;align-items:center;gap:6px;">
-                <span>${t}</span>
-                <span class="sync-health-pill ${badgeClass}" style="font-size:9px;padding:1px 4px;">${badgeText}</span>
+              <button class="ticker-chip ${t===selectedTicker?'active':''}" data-ticker="${t}" style="display:inline-flex;flex-direction:column;align-items:flex-start;gap:4px;padding:8px 12px;height:auto;">
+                <div style="display:flex;align-items:center;gap:6px;width:100%;">
+                  <span style="font-weight:bold;">${t}</span>
+                  <span class="sync-health-pill ${badgeClass}" style="font-size:9px;padding:1px 4px;margin-left:auto;">${badgeText}</span>
+                </div>
+                ${missingText}
               </button>
             `;
           }).join("")
@@ -192,10 +222,10 @@ const FundamentalsModule = (function () {
         });
       });
 
-      if (!selectedTicker && filtered.length) selectedTicker = filtered[0];
-      if (selectedTicker && filtered.includes(selectedTicker)) {
+      if (!filtered.includes(selectedTicker)) selectedTicker = filtered[0] || null;
+      if (selectedTicker) {
         renderDetail(container.querySelector("#fund-detail"), selectedTicker, container);
-      } else if (!filtered.length) {
+      } else {
         container.querySelector("#fund-detail").innerHTML = "";
       }
     }
@@ -208,6 +238,25 @@ const FundamentalsModule = (function () {
     container.querySelector("#fund-status-filter").addEventListener("change", e => {
       state.filterStatus = e.target.value;
       refreshList();
+    });
+
+    container.querySelector("#fund-sort-by").addEventListener("change", e => {
+      state.sortBy = e.target.value;
+      refreshList();
+    });
+
+    container.querySelector("#btn-export-csv").addEventListener("click", () => {
+      if (typeof FundamentalsCsv !== "undefined") FundamentalsCsv.exportTemplate();
+    });
+
+    const fileInput = container.querySelector("#fund-import-file");
+    container.querySelector("#btn-import-csv").addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", e => {
+      if (!e.target.files.length) return;
+      if (typeof FundamentalsCsv !== "undefined") {
+        FundamentalsCsv.handleImportFile(e.target.files[0], container, () => refreshList());
+      }
+      e.target.value = "";
     });
 
     refreshList();
@@ -252,6 +301,8 @@ const FundamentalsModule = (function () {
     const fieldStatus = fundamentals.fieldStatus || {};
     const statusLabels = { roe: "ROE", debtEquity: "Debt/Equity", pe: "P/E", revenueCagr: "Revenue CAGR", roce: "ROCE", netMargin: "Net Margin", earningsCagr: "Earnings CAGR", promoterHolding: "Promoter Holding", promoterPledge: "Promoter Pledge", fcfStatus: "FCF Status", economicMoat: "Economic Moat", pricingPower: "Pricing Power" };
 
+    const exactStatus = CompanyCalculations.determineReviewStatus(fundamentals);
+
     el.innerHTML = `
       <div class="ticket" style="border-left:4px solid ${isFull ? 'var(--gain)' : 'var(--amber)'};">
         <div class="ticket-body" style="width:100%">
@@ -261,7 +312,7 @@ const FundamentalsModule = (function () {
               <div class="module-sub" style="margin:2px 0 0">${security.displayName || ticker} · ${security.sector || 'Nifty 500'}${security.isBank ? ' · Financial institution' : ''}</div>
             </div>
             <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
-              <span class="sync-health-pill ${isFull ? 'sync-health-healthy' : 'sync-health-degraded'}">${isFull ? 'Enrolled (Full Rating)' : 'Fundamentals Incomplete'}</span>
+              <span class="sync-health-pill ${isFull ? 'sync-health-healthy' : 'sync-health-degraded'}">${exactStatus}</span>
               <div class="ticket-score"><div class="n">${quality === null ? "—" : quality.toFixed(0)}</div><div class="l">quality /100</div></div>
             </div>
           </div>

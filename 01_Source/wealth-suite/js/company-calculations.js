@@ -104,5 +104,92 @@ const CompanyCalculations = (function () {
     return { complete: missing.length === 0, missing, evidenceStatus: status };
   }
 
-  return { qualityScore, detectRedFlags, latestRatios, hasMinimumFundamentals, fundamentalCoverage, evidenceStatus };
+  function determineReviewStatus(fundamentals) {
+    if (!fundamentals) return "Missing";
+    const status = evidenceStatus(fundamentals);
+    const coverage = fundamentalCoverage(fundamentals);
+    if (coverage.complete) return "Eligible for Full Rating";
+    if (status === "Verified") return "Verified"; // Verified but partial
+    if (status === "Stale") return "Stale";
+    if (status === "User-entered/unverified") return "User-entered / unverified";
+    return "Partial"; // Status missing, but some data exists
+  }
+
+  function validateCsvRow(row, rowIndex, allRows) {
+    const errors = [];
+    if (!row.Ticker) {
+      errors.push("Missing Ticker");
+    } else if (typeof NIFTY_500_TICKERS !== "undefined" && !NIFTY_500_TICKERS.includes(row.Ticker)) {
+      errors.push(`Invalid Ticker: ${row.Ticker} is not recognized as a Nifty 500 constituent`);
+    }
+
+    if (!row.Period || !/^(?:Q[1-4]\s)?FY\d{2}$/.test(row.Period)) {
+      errors.push(`Invalid Period format: ${row.Period} (Must be FYXX or QX FYXX)`);
+    }
+
+    if (row.Evidence_Date) {
+      const formatIsValid = /^\d{4}-\d{2}-\d{2}$/.test(row.Evidence_Date);
+      const parsedDate = new Date(`${row.Evidence_Date}T00:00:00Z`);
+      const canonicalDate = Number.isNaN(parsedDate.getTime()) ? "" : parsedDate.toISOString().slice(0, 10);
+      if (!formatIsValid || Number.isNaN(parsedDate.getTime()) || canonicalDate !== row.Evidence_Date) {
+        errors.push("Invalid Evidence_Date format (use YYYY-MM-DD)");
+      } else if (parsedDate > new Date()) {
+        errors.push("Future Evidence_Date not allowed");
+      }
+    }
+
+    const allowedReviewStatuses = ["", "User-entered/unverified", "Verified"];
+    if (!allowedReviewStatuses.includes(row.Review_Status || "")) errors.push(`Invalid Review_Status: ${row.Review_Status}`);
+
+    const allowedFcfStatuses = ["", "Positive", "Negative"];
+    if (!allowedFcfStatuses.includes(row.FCF_Status || "")) errors.push(`Invalid FCF_Status: ${row.FCF_Status}`);
+
+    if (row.Review_Status === "Verified" && (!row.Source_Name || !row.Evidence_Date)) {
+      errors.push("Verified status requires Source_Name and Evidence_Date");
+    }
+
+    const pctFields = ["ROE_Pct", "ROCE_Pct", "Rev_CAGR_Pct", "Earn_CAGR_Pct", "Promoter_Hold_Pct", "Promoter_Pledge_Pct"];
+    const otherNums = ["Debt_Equity", "PE_Ratio"];
+
+    [...pctFields, ...otherNums].forEach(f => {
+      if (row[f] !== "" && row[f] !== null && row[f] !== undefined) {
+        const num = Number(row[f]);
+        if (Number.isNaN(num) || !Number.isFinite(num)) {
+          errors.push(`Invalid numeric value in ${f}: ${row[f]}`);
+        } else if (pctFields.includes(f) && (num < -1000 || num > 10000)) {
+          errors.push(`Percentage out of reasonable bounds in ${f}: ${row[f]}`);
+        } else if (otherNums.includes(f) && (num < -1000 || num > 10000)) {
+          errors.push(`Ratio out of reasonable bounds in ${f}: ${row[f]}`);
+        }
+      }
+    });
+
+    const qualFields = ["Econ_Moat", "Pricing_Power", "Cap_Allocation", "Mgmt_Quality"];
+    qualFields.forEach(f => {
+      if (row[f] !== "" && row[f] !== null && row[f] !== undefined) {
+        const num = Number(row[f]);
+        if (Number.isNaN(num) || !Number.isFinite(num) || num < 1 || num > 5) {
+          errors.push(`Qualitative score must be between 1 and 5 in ${f}: ${row[f]}`);
+        }
+      }
+    });
+
+    ["Promoter_Hold_Pct", "Promoter_Pledge_Pct"].forEach(f => {
+      if (row[f] !== "" && row[f] !== null && row[f] !== undefined) {
+        const num = Number(row[f]);
+        if (Number.isFinite(num) && (num < 0 || num > 100)) errors.push(`${f} must be between 0 and 100`);
+      }
+    });
+
+    if (allRows && row.Ticker && row.Period) {
+      const dup = allRows.find((r, idx) => idx !== rowIndex && r.Ticker === row.Ticker && r.Period === row.Period);
+      if (dup) errors.push(`Duplicate record for ${row.Ticker} ${row.Period}`);
+    }
+
+    return errors;
+  }
+
+  return { qualityScore, detectRedFlags, latestRatios, hasMinimumFundamentals, fundamentalCoverage, evidenceStatus, determineReviewStatus, validateCsvRow };
 })();
+
+if (typeof globalThis !== "undefined") globalThis.CompanyCalculations = CompanyCalculations;
