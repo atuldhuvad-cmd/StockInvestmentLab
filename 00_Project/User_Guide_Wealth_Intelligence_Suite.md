@@ -10,7 +10,7 @@
 
 1. **Strictly Personal Use:** Built exclusively for single-user personal investment & paper trading. Zero enterprise complexity, zero subscription fees, zero cloud dependency.
 2. **Mobile-First & Wi-Fi Operable:** Every screen and action is designed to be easily operable on smartphone touchscreens (iOS / Android) over your local Wi-Fi.
-3. **Zero-CSV Manual Friction:** Tap **"⚡ Sync Public Prices"** to automatically update historical technical prices without downloading or uploading CSV files.
+3. **Zero-CSV Manual Friction:** Tap **"⚡ Sync Nifty 500 Public Prices"** to automatically update historical technical prices without downloading or uploading CSV files.
 4. **100% Broker-Free:** Uses free public market data (Yahoo Finance `.NS` symbols). Zero broker logins, credentials, or API keys required.
 
 ---
@@ -41,9 +41,9 @@
 ### Step 2: Delivery Screener & 1-Click Public Auto-Sync
 * **Purpose:** Find high-quality delivery candidates ranked across 5 quantitative pillars (*Business Quality, Financial Strength, Valuation, Technical Trend, Risk*).
 * **Actions:**
-  1. Click **`⚡ Sync Public Prices (No CSV Needed)`** in the Price History Data Center.
-  2. The server pulls 250+ daily completed candles for all watchlist/delivery stocks (e.g. TCS, INFY, ICICIBANK, NIFTY 50).
-  3. Technical Trend 5-pillar evaluations update automatically across all candidates.
+  1. Click **`⚡ Sync Nifty 500 Public Prices`** in the Price History Data Center.
+  2. Leaving the ticker field blank pulls 250+ daily completed candles for all 500 official Nifty 500 constituents, plus Nifty 50 and Nifty Bank benchmarks.
+  3. The ten companies with enrolled fundamental records receive complete 5-pillar Delivery rankings; the broader Nifty 500 universe receives validated technical price history for watchlist and future screening use.
   4. If network fails for a ticker, click **`Retry Failed Tickers`** to retry only the missing symbols.
 
 ### Step 3: Portfolio Module (Real Investments)

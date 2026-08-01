@@ -22,11 +22,13 @@ import json
 import math
 import urllib.request
 import urllib.error
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, date
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_DIR = os.path.join(PROJECT_ROOT, "config")
 SYMBOL_MAP_PATH = os.path.join(CONFIG_DIR, "public_symbol_map.json")
+NIFTY500_SYMBOLS_PATH = os.path.join(CONFIG_DIR, "nifty500_symbols.txt")
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from validate_market_data import (
@@ -43,6 +45,18 @@ def load_symbol_map():
         except Exception:
             pass
     return {}
+
+def load_default_universe():
+    """Return the frozen official Nifty 500 universe plus benchmark indices."""
+    symbols = []
+    if os.path.exists(NIFTY500_SYMBOLS_PATH):
+        with open(NIFTY500_SYMBOLS_PATH, "r", encoding="utf-8") as source:
+            symbols = [
+                line.strip().upper() for line in source
+                if line.strip() and not line.lstrip().startswith("#")
+            ]
+    benchmarks = ["NIFTY", "BANKNIFTY"]
+    return list(dict.fromkeys(symbols + benchmarks))
 
 class MarketDataProvider:
     """Abstract base class for public market data providers."""
@@ -165,10 +179,20 @@ class YFinanceProvider(MarketDataProvider):
 
     def download_daily(self, symbols, period="1y"):
         results = {}
-        for sym in symbols:
-            clean_sym = str(sym).strip().upper()
-            if clean_sym:
-                ok, err, rows, provider_sym = self.download_single(clean_sym)
+        clean_symbols = list(dict.fromkeys(
+            str(sym).strip().upper() for sym in symbols if str(sym).strip()
+        ))
+        # A bounded worker pool keeps a 500-stock personal sync practical without
+        # flooding the free public provider or requiring enterprise job services.
+        with ThreadPoolExecutor(max_workers=min(8, len(clean_symbols) or 1)) as executor:
+            jobs = {executor.submit(self.download_single, sym): sym for sym in clean_symbols}
+            for job in as_completed(jobs):
+                clean_sym = jobs[job]
+                try:
+                    ok, err, rows, provider_sym = job.result()
+                except Exception as exc:
+                    ok, err, rows = False, str(exc), []
+                    provider_sym = self.resolve_provider_symbol(clean_sym)
                 results[clean_sym] = {
                     "ok": ok,
                     "error": err if not ok else None,
@@ -187,8 +211,7 @@ def sync_public_prices(target_symbols=None, retry_failed_only=False):
     provider = YFinanceProvider()
 
     if target_symbols is None:
-        # Default target symbols list
-        target_symbols = list(provider.symbol_map.keys())
+        target_symbols = load_default_universe()
 
     if retry_failed_only:
         # Filter symbols that failed or are missing in current snapshot

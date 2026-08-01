@@ -69,6 +69,15 @@ class PublicSyncTests(unittest.TestCase):
         self.assertEqual(provider.resolve_provider_symbol("NIFTY"), "^NSEI")
         self.assertEqual(provider.resolve_provider_symbol("TCS.NS"), "TCS.NS")
 
+    def test_default_universe_contains_complete_nifty_500_and_benchmarks(self):
+        universe = fetcher.load_default_universe()
+        equities = [symbol for symbol in universe if symbol not in ("NIFTY", "BANKNIFTY")]
+        self.assertEqual(len(equities), 500)
+        self.assertEqual(len(equities), len(set(equities)))
+        self.assertIn("NIFTY", universe)
+        self.assertIn("BANKNIFTY", universe)
+        self.assertIn("RELIANCE", equities)
+
     def test_validation_requires_200_rows_and_rejects_non_finite(self):
         ok, error, _, _ = validator.validate_ohlcv_rows(valid_rows(199))
         self.assertFalse(ok)

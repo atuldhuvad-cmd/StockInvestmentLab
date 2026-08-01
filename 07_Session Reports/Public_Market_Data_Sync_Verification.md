@@ -3,7 +3,7 @@
 **Date:** 2026-08-01
 **Project:** Stock Investment Lab / Wealth Intelligence Suite
 **Baseline:** `v1.8.0` (`a25c231`)
-**Target Branch:** `codex/public-market-data-sync`
+**Current Expansion Branch:** `codex/nifty-500-universe`
 
 ## Executive Summary
 
@@ -17,8 +17,8 @@ All 16 central regression suites pass with 0 failures. The system is 100% broker
 
 1. **Public Price Downloader (`scripts/fetch_public_prices.py`):**
    * Implements abstract `MarketDataProvider` base class and `YFinanceProvider` adapter.
-   * Downloads configured Indian `.NS` equities and `^NSEI` Nifty 50 within one bounded sync job, producing 200–250 validated completed daily rows per accepted symbol.
-   * Uses `config/public_symbol_map.json` for explicit ticker symbol resolution.
+   * Downloads the frozen official 500-stock Nifty 500 constituent universe plus Nifty 50 and Nifty Bank benchmarks within one bounded, eight-worker sync job, producing 200–250 validated completed daily rows per accepted symbol.
+   * Uses `config/nifty500_symbols.txt` for the official constituent universe and `config/public_symbol_map.json` for benchmark aliases.
 
 2. **Validation & Atomic Storage (`scripts/validate_market_data.py`):**
    * Enforces strict OHLCV validation: rejects non-finite values, non-positive prices/volumes, invalid high/low boundary violations (`high < max(open,close)` or `low > min(open,close)`), duplicate dates, and stale dates (>5 trading days).
@@ -47,6 +47,7 @@ All 16 central regression suites pass with 0 failures. The system is 100% broker
 | Test Case | Description | Result |
 |---|---|:---:|
 | Symbol mapping | Resolves `TCS` -> `TCS.NS` and `NIFTY` -> `^NSEI` | **PASS** |
+| Universe completeness | Requires 500 unique equities plus Nifty 50 and Nifty Bank benchmarks | **PASS** |
 | Strict validation | Requires 200 rows; rejects duplicates, non-finite prices, and invalid boundaries | **PASS** |
 | Stale-date detection | Counts weekdays and rejects future dates | **PASS** |
 | Atomic snapshots | Replaces current snapshot and retains the prior snapshot | **PASS** |
@@ -54,11 +55,11 @@ All 16 central regression suites pass with 0 failures. The system is 100% broker
 | Retry behavior | Retries records marked `PRESERVED_ON_FAILURE` | **PASS** |
 | API behavior | Exercises read endpoints and rejects wrong-content-type/cross-origin writes | **PASS** |
 
-**Deterministic result:** 8 tests passed, 0 failed. No network call is required by the automated suite.
+**Deterministic result:** 9 tests passed, 0 failed. No network call is required by the automated suite.
 
 ### Live Provider Check
 
-The 2026-08-01 live personal-use check accepted 12 configured symbols on the first pass with 246–250 rows. MARUTI and TRENT exposed non-finite final provider rows; the downloader was corrected to discard incomplete/non-finite provider candles before validation, and retry then accepted both with 0 failures. Runtime snapshots are intentionally Git-ignored so daily use does not dirty the repository.
+The pre-expansion 2026-08-01 live personal-use check accepted all 12 original configured symbols with 246–250 rows. MARUTI and TRENT exposed non-finite final provider rows; the downloader was corrected to discard incomplete/non-finite provider candles before validation, and retry then accepted both with 0 failures. The 500-stock expansion is verified deterministically rather than issuing 500 provider requests during regression. Runtime snapshots are intentionally Git-ignored so daily use does not dirty the repository.
 
 ### Central Regression Verification (16 Suites)
 

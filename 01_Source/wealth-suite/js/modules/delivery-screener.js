@@ -235,10 +235,10 @@ const DeliveryScreenerModule = (function () {
       <div class="panel" id="ds-price-import-panel" style="margin-bottom:20px;max-width:none;">
         <div class="section-head" style="margin-bottom:12px;"><span class="section-title" style="font-size:15px;">Price History Data Center</span></div>
         <p class="module-sub" style="margin-bottom:14px;">Auto-Sync free public EOD historical closes (no broker login or CSV file required), or choose a local OHLCV CSV file as a fallback.</p>
-        <div class="field-row"><label for="ds-price-symbol">Ticker (optional if syncing all watchlist companies)</label><input type="text" id="ds-price-symbol" style="text-transform:uppercase" placeholder="e.g. TCS or TCS.NS"></div>
+        <div class="field-row"><label for="ds-price-symbol">Ticker (optional; leave blank to sync all Nifty 500 constituents)</label><input type="text" id="ds-price-symbol" style="text-transform:uppercase" placeholder="e.g. TCS or TCS.NS"></div>
         <div class="field-row"><label for="ds-price-file">CSV file (manual fallback)</label><input type="file" id="ds-price-file" accept=".csv,text/csv"></div>
         <div class="paper-action-row" style="margin-top:10px;">
-          <button class="btn" id="ds-price-autosync-btn" style="background:var(--gain);color:#fff;">⚡ Sync Public Prices (No CSV Needed)</button>
+          <button class="btn" id="ds-price-autosync-btn" style="background:var(--gain);color:#fff;">⚡ Sync Nifty 500 Public Prices</button>
           <button class="btn" id="ds-price-retry-btn" style="background:transparent;border:1px solid var(--amber);color:var(--amber-bright);">Retry Failed Tickers</button>
           <button class="btn" id="ds-price-import-btn" style="background:transparent;border:1px solid var(--rule-bright);color:var(--paper-dim);">Import Local CSV</button>
         </div>
@@ -263,7 +263,7 @@ const DeliveryScreenerModule = (function () {
     async function handlePublicSync(endpoint = "/api/sync-public-prices", retryOnly = false) {
       const resultEl = container.querySelector("#ds-price-import-result");
       const targetTicker = symbolInput.value.trim().toUpperCase();
-      const targetList = targetTicker ? [targetTicker] : tickers;
+      const targetList = targetTicker ? [targetTicker] : null;
       App.showStatus(`Syncing public market data...`, "ok");
       if (resultEl) resultEl.textContent = "Connecting to local market data server...";
       try {
@@ -280,7 +280,7 @@ const DeliveryScreenerModule = (function () {
         let importedCount = 0;
         let latestDateFound = "—";
         for (const [sym, item] of Object.entries(snapshotTickers)) {
-          if (targetList.includes(sym) && item.valid && item.validation_status === "VALID" && item.rows && item.rows.length >= 200) {
+          if ((!targetList || targetList.includes(sym)) && item.valid && item.validation_status === "VALID" && item.rows && item.rows.length >= 200) {
             WealthData.setPriceHistory(sym, {
               symbol: sym,
               sourceSymbol: item.provider_ticker || sym,
