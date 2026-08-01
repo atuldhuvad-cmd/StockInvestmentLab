@@ -121,3 +121,32 @@ WL-01 through WL-07 are non-financial business rules, registered below for parit
 | WL-07 | Remove by Id | Watchlist | Verified | No | Watchlist / data model | N/A | Watchlist_Financial_Specification.md | Watchlist_Verification_Report.md | Regression suite, WL-07 tests | High |
 
 Watchlist — Phase 1A through Freeze complete, 2026-07-23. Zero shared/duplicated financial calculations (computes none). Zero Confirmed Defects; one Potential Defect (WL-D01, Overview label drift) recorded and deferred by owner decision. Behaviour-preserving Option B extraction (`buildItem`, `sortByDateAdded`, `categoryLabel` exposed) approved before applying. 41/41 new regression tests pass; all 6 previously-frozen modules re-confirmed unaffected (project-wide 23 suites, 0 failures from repo root). **Frozen v1.0, 2026-07-23.** Next module in the established order: Persistence / Import / Export.
+
+## Cross-Module Consistency Summary — Persistence (new, 2026-07-23)
+
+Persistence computes no financial ratio, score, or currency amount — confirmed by Phase 1A (`Persistence_CrossModule_Review.md`), so none of its 7 infrastructure behaviours share logic with any already-verified module. It is the shared save/load/backup foundation the whole app depends on (via `App.saveNow`, init load, and the Export/Import buttons) but calls into no module. Its core primitive, `WealthData.replaceAll()` (the schema-forward-compatible merge onto `emptyState()`), is used **only** by Persistence's `load()` and `importFromFile()` — the mechanism behind the "backup round-trip safety" invariant every prior module asserted. Macro's `importSnapshot` parse-and-merge is a narrower, independent section-merge (documented, no shared code). **Verified with Option A** (real functions against in-memory browser-API fakes); the stub-fidelity limitation — a stubbed IndexedDB is not proof of a real browser round-trip — is stated explicitly in the Verification Report.
+
+| ID | Calculation | Module | Status | Shared Logic | Source of Truth | Consistency Status | Specification | Verification Report | Regression Tests | Confidence |
+|---|---|---|---|---|---|---|---|---|---|---|
+| PER-01 | Single-Record Storage Model | Persistence | Verified | No | Persistence | N/A — new | Persistence_Financial_Specification.md | Persistence_Verification_Report.md | Regression suite, PER-01 | High (mock) |
+| PER-02 | Save + `lastSavedAt` stamp | Persistence | Verified | No | Persistence | N/A | Persistence_Financial_Specification.md | Persistence_Verification_Report.md | Regression suite, PER-02 | High (mock) |
+| PER-03 | Load — merge-or-first-run (`replaceAll`) | Persistence | Verified | **Yes** — `WealthData.replaceAll()` | `data-model.js` (`replaceAll()`), used only by Persistence | **Verified Consistent** — single consumer, no divergence | Persistence_Financial_Specification.md | Persistence_Verification_Report.md | Regression suite, PER-03 | High (mock) |
+| PER-04 | Export payload + filename | Persistence | Verified | No | Persistence | N/A | Persistence_Financial_Specification.md | Persistence_Verification_Report.md | Regression suite, PER-04 | High (mock) |
+| PER-05 | Export persists backup timestamp | Persistence | Verified | No | Persistence | N/A | Persistence_Financial_Specification.md | Persistence_Verification_Report.md | Regression suite, PER-05 | High (mock) |
+| PER-06 | Import validation + replace | Persistence | Verified — **PER-D01 fixed 2026-07-23** | **Yes** — `WealthData.replaceAll()` | Persistence / `data-model.js` | **Verified Consistent** | Persistence_Financial_Specification.md | Persistence_Verification_Report.md | Regression suite, PER-06 / PER-D01 | High (mock) |
+| PER-07 | Error handling (catch → false) | Persistence | Verified (by reading) | No | Persistence | N/A | Persistence_Financial_Specification.md | Persistence_Verification_Report.md | Read-level (fake can't fail realistically) | Medium (not execution-tested) |
+
+Persistence — Phase 1A through Freeze complete, 2026-07-23. Zero shared/duplicated financial calculations. **One Confirmed Defect found by execution and fixed this pass (PER-D01** — import validation only checked `typeof === object`, so `{}`/arrays/wrong-shape objects passed and `replaceAll` silently wiped all data; guard tightened to require a non-array object carrying a recognized backup section). Full Phase 6A completed. **One Potential Defect recorded, not fixed per owner decision (PER-D02** — `replaceAll` does no inner-shape type validation). 30/30 regression tests pass (Option A, stubbed browser APIs — fidelity limitation stated in the Verification Report); all 7 previously-frozen modules re-confirmed unaffected (project-wide 25 suites, 0 failures from repo root). **Frozen v1.0, 2026-07-23.** Next module in the established order: Settings.
+
+## Cross-Module Consistency Summary — Settings (new, 2026-08-01)
+
+Settings computes no financial value and duplicates no verified logic. Its two retained compatibility values are read by the hidden Intraday module and transported by Persistence. The inactive renderer is informational only.
+
+| ID | Calculation / Rule | Module | Status | Shared Logic | Source of Truth | Consistency Status | Specification | Verification Report | Regression Tests | Confidence |
+|---|---|---|---|---|---|---|---|---|---|---|
+| SET-01 | Default Compatibility Values | Settings | Verified | No | `data-model.js` | N/A | Settings_Financial_Specification.md | Settings_Verification_Report.md | SET-01 tests | High |
+| SET-02 | Settings Read Access | Settings | Verified | No | `data-model.js` | N/A | Settings_Financial_Specification.md | Settings_Verification_Report.md | SET-02 tests | High |
+| SET-03 | Backup-Compatible Replace / Reset | Settings | Verified | Yes — Persistence transports state | `data-model.js` / Persistence | Verified consistent; PER-D02 remains owned by Persistence | Settings_Financial_Specification.md | Settings_Verification_Report.md | SET-03 tests | High |
+| SET-04 | Inactive Compatibility Render | Settings | Verified | No | `settings.js` | N/A | Settings_Financial_Specification.md | Settings_Verification_Report.md | SET-04 tests | High |
+
+Settings — Phase 1A through Freeze complete, 2026-08-01. Four non-financial compatibility rules verified, 9/9 assertions pass, zero defects found, and no production changes required. **Frozen v1.0. Verification program: 9 of 9 modules complete.**
