@@ -33,3 +33,19 @@ paper-delivery-transactions-*.csv
 # Separate local workspace projects and personal utility scripts
 /Life Vault/
 /scripts/
+
+# Track the Public Market Data Sync subsystem while keeping unrelated personal
+# utilities under scripts/ local-only.
+!/scripts/
+/scripts/*
+!/scripts/fetch_public_prices.py
+!/scripts/validate_market_data.py
+!/scripts/serve_wealth_suite.py
+!/scripts/test_public_sync_system.py
+
+# Runtime public-market snapshots are local state; tracked *.example.json files
+# document their shape without dirtying Git after each daily sync.
+/data/public_market_data.json
+/data/public_market_data_previous.json
+/data/public_sync_status.json
+/data/wealth_suite_server.pid

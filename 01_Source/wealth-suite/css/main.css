@@ -235,3 +235,23 @@ tbody tr:hover td { background: var(--bg-ticket); color: var(--paper); }
   .paper-action-row .btn, .paper-action-row .ticker-chip { width:auto; flex:0 1 auto; }
   .paper-review-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); }
 }
+
+/* Data Health Status Pills & Sync Controls */
+.sync-health-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: 4px; font-family: var(--mono);
+  font-size: 11px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase;
+}
+.sync-health-healthy { background: rgba(125, 179, 123, 0.15); color: var(--gain); border: 1px solid var(--gain); }
+.sync-health-degraded { background: rgba(217, 154, 61, 0.15); color: var(--amber-bright); border: 1px solid var(--amber); }
+.sync-health-failed { background: rgba(201, 115, 105, 0.15); color: var(--loss); border: 1px solid var(--loss); }
+.sync-health-stale { background: rgba(138, 107, 51, 0.15); color: var(--amber); border: 1px solid var(--amber-dim); }
+
+.sync-status-box {
+  margin-top: 10px; padding: 12px; border: 1px solid var(--rule-bright);
+  background: var(--bg-ticket); font-family: var(--mono); font-size: 12px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.sync-status-counts {
+  display: flex; gap: 12px; flex-wrap: wrap; margin-top: 4px; font-size: 11px;
+}

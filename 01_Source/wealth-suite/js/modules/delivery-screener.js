@@ -233,16 +233,20 @@ const DeliveryScreenerModule = (function () {
         <p class="module-sub">Which companies deserve closer study this week — not a buy/sell signal, a shortlist to start from.</p>
       </div>
       <div class="panel" id="ds-price-import-panel" style="margin-bottom:20px;max-width:none;">
-        <div class="section-head" style="margin-bottom:12px;"><span class="section-title" style="font-size:15px;">Import Price History CSV</span></div>
-        <p class="module-sub" style="margin-bottom:14px;">Offline OHLCV only. Required columns: Date, Open, High, Low, Close, Volume. Ticker can be entered below or inferred from filenames such as TCS_5Y.csv or TCS.NS.csv.</p>
-        <div class="field-row"><label for="ds-price-symbol">Ticker (optional if filename identifies it)</label><input type="text" id="ds-price-symbol" style="text-transform:uppercase" placeholder="e.g. TCS or TCS.NS"></div>
-        <div class="field-row"><label for="ds-price-file">CSV file</label><input type="file" id="ds-price-file" accept=".csv,text/csv"></div>
-        <button class="btn" id="ds-price-import-btn">Import CSV</button>
+        <div class="section-head" style="margin-bottom:12px;"><span class="section-title" style="font-size:15px;">Price History Data Center</span></div>
+        <p class="module-sub" style="margin-bottom:14px;">Auto-Sync free public EOD historical closes (no broker login or CSV file required), or choose a local OHLCV CSV file as a fallback.</p>
+        <div class="field-row"><label for="ds-price-symbol">Ticker (optional if syncing all watchlist companies)</label><input type="text" id="ds-price-symbol" style="text-transform:uppercase" placeholder="e.g. TCS or TCS.NS"></div>
+        <div class="field-row"><label for="ds-price-file">CSV file (manual fallback)</label><input type="file" id="ds-price-file" accept=".csv,text/csv"></div>
+        <div class="paper-action-row" style="margin-top:10px;">
+          <button class="btn" id="ds-price-autosync-btn" style="background:var(--gain);color:#fff;">⚡ Sync Public Prices (No CSV Needed)</button>
+          <button class="btn" id="ds-price-retry-btn" style="background:transparent;border:1px solid var(--amber);color:var(--amber-bright);">Retry Failed Tickers</button>
+          <button class="btn" id="ds-price-import-btn" style="background:transparent;border:1px solid var(--rule-bright);color:var(--paper-dim);">Import Local CSV</button>
+        </div>
         <div class="module-sub" id="ds-price-import-result" style="margin-top:10px;"></div>
       </div>
       <div class="specimen">
         <h2>Reading this screen</h2>
-        <p>Five pillars, always visible: Business Quality, Financial Strength, Valuation, Technical Trend, Risk. Technical Trend uses only an OHLCV CSV you select locally. Missing or limited history keeps the assessment partial and prevents the highest recommendation; 200 or more valid rows completes the five-pillar model.</p>
+        <p>Five pillars, always visible: Business Quality, Financial Strength, Valuation, Technical Trend, Risk. Technical Trend uses free public OHLCV data or a local CSV file. Missing or limited history keeps the assessment partial and prevents the highest recommendation; 200 or more valid rows completes the five-pillar model.</p>
         <p class="final">Ranked from your ${allCandidates.length} companies with fundamentals data. A company with no fundamentals data can't be ranked — add it in Fundamentals first.</p>
       </div>
       ${ListControls.renderControlsBar("ds-controls", ListControls.uniqueSectors(allCandidates, c => c.security && c.security.sector), sortOptions, "overall")}
@@ -255,6 +259,66 @@ const DeliveryScreenerModule = (function () {
 
     const fileInput = container.querySelector("#ds-price-file");
     const symbolInput = container.querySelector("#ds-price-symbol");
+
+    async function handlePublicSync(endpoint = "/api/sync-public-prices", retryOnly = false) {
+      const resultEl = container.querySelector("#ds-price-import-result");
+      const targetTicker = symbolInput.value.trim().toUpperCase();
+      const targetList = targetTicker ? [targetTicker] : tickers;
+      App.showStatus(`Syncing public market data...`, "ok");
+      if (resultEl) resultEl.textContent = "Connecting to local market data server...";
+      try {
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tickers: targetList })
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status} - Sync service unavailable`);
+        const data = await response.json();
+        const snapshot = data.snapshot || {};
+        const snapshotTickers = snapshot.tickers || {};
+
+        let importedCount = 0;
+        let latestDateFound = "—";
+        for (const [sym, item] of Object.entries(snapshotTickers)) {
+          if (targetList.includes(sym) && item.valid && item.validation_status === "VALID" && item.rows && item.rows.length >= 200) {
+            WealthData.setPriceHistory(sym, {
+              symbol: sym,
+              sourceSymbol: item.provider_ticker || sym,
+              importedAt: item.fetch_timestamp || new Date().toISOString(),
+              rows: item.rows
+            });
+            importedCount++;
+            if (item.latest_date) latestDateFound = item.latest_date;
+          }
+        }
+        await App.saveNow(false);
+        App.showStatus(`Synced ${importedCount} public price histories. Latest date: ${latestDateFound}`, "ok");
+        renderScreener(container);
+        const refreshedResult = container.querySelector("#ds-price-import-result");
+        if (refreshedResult) {
+          const succ = data.successful ?? importedCount;
+          const fail = data.failed || 0;
+          const stale = data.stale || 0;
+          refreshedResult.innerHTML = `
+            <div class="sync-status-box">
+              <div><strong>Sync Complete:</strong> Successful: ${succ} · Failed: ${fail} · Stale: ${stale}</div>
+              <div><strong>Latest Market Date:</strong> ${latestDateFound}</div>
+              ${fail > 0 ? `<div style="color:var(--loss);">Failed tickers: ${(data.failed_tickers || []).join(", ")}</div>` : ""}
+            </div>
+          `;
+        }
+      } catch (error) {
+        App.showStatus("Public sync failed: " + error.message, "error");
+        if (resultEl) resultEl.textContent = "Sync error: " + error.message;
+      }
+    }
+
+    const autoSyncBtn = container.querySelector("#ds-price-autosync-btn");
+    if (autoSyncBtn) autoSyncBtn.addEventListener("click", () => handlePublicSync("/api/sync-public-prices", false));
+
+    const retryBtn = container.querySelector("#ds-price-retry-btn");
+    if (retryBtn) retryBtn.addEventListener("click", () => handlePublicSync("/api/retry-failed-prices", true));
+
     container.querySelector("#ds-price-import-btn").addEventListener("click", async () => {
       const file = fileInput.files[0];
       if (!file) { App.showStatus("Choose an OHLCV CSV file first", "error"); return; }

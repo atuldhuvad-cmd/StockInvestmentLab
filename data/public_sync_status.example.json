@@ -1,0 +1,11 @@
+{
+  "last_sync_timestamp": null,
+  "total_tickers": 0,
+  "successful_count": 0,
+  "failed_count": 0,
+  "stale_count": 0,
+  "skipped_count": 0,
+  "failed_tickers": [],
+  "stale_tickers": [],
+  "data_health": "UNKNOWN"
+}

@@ -8,6 +8,13 @@ A verified **Personal Delivery Investment and Portfolio Management Platform**
 (`01_Source\wealth-suite`), built in pure HTML/CSS/JS with IndexedDB persistence,
 alongside formal, evidence-based verification history.
 
+## Core Operating Mandate (All Current & Future Work)
+
+1. **Strictly Personal Use:** Built exclusively for single-user personal investment, research, and paper trading. No commercial, enterprise, or multi-tenant complexity.
+2. **Mobile-First & Wi-Fi Operable:** Every module, form, card, and action must be easily operable on mobile phone touchscreens (iOS/Android) over local Wi-Fi.
+3. **Zero-CSV Manual Friction:** Public market data auto-sync runs cleanly without requiring manual CSV file downloads or touch-screen file pickers on mobile.
+4. **Broker-Free Independence:** Core screener, paper trading, and price history use free public market data without requiring broker logins, API keys, or paid subscriptions.
+
 ## Active application (wealth-suite-v1.8)
 
 The focused platform has six active navigation modules, in this order:
