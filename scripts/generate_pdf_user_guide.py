@@ -18,7 +18,7 @@ MD_OUTPUT_PATH = os.path.join(PROJECT_DOCS_DIR, "User_Guide_Wealth_Intelligence_
 
 USER_GUIDE_MD_TEXT = """# 📘 Step-by-Step User Guide: Wealth Intelligence Suite
 
-**System Version:** v1.8.0 / Public Sync v1.9.0
+**System Version:** v2.0.0 / Searchable Nifty 500 Screener
 **Scope:** Strictly Personal Single-User Investment, Portfolio Management, and Paper Trading
 **Architecture:** Pure Offline Web App + Public Market Data Auto-Sync Engine
 
@@ -61,8 +61,9 @@ USER_GUIDE_MD_TEXT = """# 📘 Step-by-Step User Guide: Wealth Intelligence Suit
 * **Actions:**
   1. Click **`⚡ Sync Nifty 500 Public Prices`** in the Price History Data Center.
   2. Leaving the ticker field blank pulls 250+ daily completed candles for all 500 official Nifty 500 constituents, plus Nifty 50 and Nifty Bank benchmarks.
-  3. The ten companies with enrolled fundamental records receive complete 5-pillar Delivery rankings; the broader Nifty 500 universe receives validated technical price history for watchlist and future screening use.
-  4. If network fails for a ticker, click **`Retry Failed Tickers`** to retry only the missing symbols.
+  3. Search any constituent by ticker, such as `DIXON`, and filter the list by Full Rating, Technical-Only, Data Missing, or Sync Failed.
+  4. The ten companies with enrolled fundamental records retain complete 5-pillar Delivery ratings. Other constituents show technical metrics with an explicit **Technical-only — fundamentals not enrolled** label and are never presented as fully rated.
+  5. If network access fails for a ticker, click **`Retry Failed Tickers`** to retry only the unsuccessful symbols.
 
 ### Step 3: Portfolio Module (Real Investments)
 * **Purpose:** Real holdings ledger and realized/unrealized gain tracking.

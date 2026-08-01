@@ -191,51 +191,161 @@ const DeliveryScreenerModule = (function () {
     return {
       ticker, security, overall: Math.round(overall * 10) / 10, rating, pillars, strengths, risks, ratios,
       redFlagCount: risk.flags.length, assessment: tech.available ? "Complete" : "Partial",
-      pillarCoverage: tech.available ? "5 of 5" : "4 of 5"
+      pillarCoverage: tech.available ? "5 of 5" : "4 of 5",
+      isFullRating: true
+    };
+  }
+
+  function computeTechnicalOnlyCandidate(ticker, snapshotItem = null) {
+    const security = WealthData.getSecurity(ticker) || { name: ticker, sector: "Nifty 500" };
+    const tech = technicalTrendPillar(ticker);
+    const symbol = PriceHistory.normalizeSymbol(ticker);
+    const record = WealthData.getPriceHistory(symbol);
+    const hasRecord = record && Array.isArray(record.rows) && record.rows.length > 0;
+    const latestRow = hasRecord ? record.rows[record.rows.length - 1] : null;
+
+    return {
+      ticker,
+      security,
+      isFullRating: false,
+      overall: null,
+      rating: "Technical-Only",
+      pillars: { technicalTrend: tech },
+      assessment: tech.available ? "Technical Complete" : (hasRecord ? "Technical Limited" : "Data Missing"),
+      pillarCoverage: "Technical-Only (1 of 5)",
+      latestPrice: latestRow ? latestRow.close : null,
+      latestDate: latestRow ? latestRow.date : null,
+      rowCount: tech.rowCount || 0,
+      validationStatus: snapshotItem ? (snapshotItem.validation_status || "MISSING") : (record ? "VALID" : "MISSING"),
+      strengths: tech.available ? [`Technical Score ${tech.score}/100`, `250-row OHLCV history`, `DMA50/200 & RSI14 computed`] : [],
+      risks: ["Fundamentals not enrolled — add verified ratios in Fundamentals to unlock a 5-pillar rating"]
     };
   }
 
   function ratingColor(rating) {
-    return { "Strong Buy": "gain", "Buy": "gain", "Watch": "flag", "Avoid": "loss" }[rating] || "";
+    return { "Strong Buy": "gain", "Buy": "gain", "Watch": "flag", "Avoid": "loss", "Technical-Only": "amber" }[rating] || "";
   }
 
-  const PAGE_SIZE = 20; // bounds DOM size regardless of universe size — the
-                        // concrete answer to "never scroll through 500 manually"
+  const PAGE_SIZE = 20;
 
   function render(container) {
     container.innerHTML = `
       <div class="module-header">
         <h2>Delivery</h2>
-        <p class="module-sub">Rank delivery candidates across the existing five pillars. Paper Buy opens the separate Paper Trading workspace.</p>
+        <p class="module-sub">Rank delivery candidates across five pillars. Search all 500 Nifty 500 constituents below.</p>
       </div>
       <div id="delivery-screener-content"></div>
     `;
     renderScreener(container.querySelector("#delivery-screener-content"));
   }
 
-  function renderScreener(container) {
-    const tickers = Object.keys(WealthData.get().fundamentals);
-    // Computed ONCE per module open (measured: ~0.1ms/company, ~50ms at 500
-    // companies — acceptable as a one-time cost). Filtering/sorting below
-    // operates on this cached array, not by recomputing pillars per keystroke.
-    const allCandidates = tickers.map(computeCandidate).filter(c => c !== null);
+  async function fetchMarketSnapshot() {
+    try {
+      const res = await fetch("/api/public-prices");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.ok && data.snapshot && data.snapshot.tickers) {
+          return data.snapshot.tickers;
+        }
+      }
+    } catch (e) {}
+    return {};
+  }
+
+  async function renderScreener(container) {
+    const fundamentalTickers = Object.keys(WealthData.get().fundamentals || {});
+    const snapshotByTicker = await fetchMarketSnapshot();
+
+    const defaultNifty500 = [
+      "360ONE","3MINDIA","ABB","ACC","ACMESOLAR","AIAENG","APLAPOLLO","AUBANK","AWL","AADHARHFC",
+      "AARTIIND","AAVAS","ABBOTINDIA","ACE","ACUTAAS","ADANIENSOL","ADANIENT","ADANIGREEN","ADANIPORTS","ADANIPOWER",
+      "ATGL","ABCAPITAL","ABFRL","ABLBL","ABREL","ABSLAMC","CPPLUS","AEGISLOG","AEGISVOPAK","AFCONS",
+      "AFFLE","AJANTPHARM","ALKEM","ABDL","ARE&M","AMBER","AMBUJACEM","ANANDRATHI","ANANTRAJ","ANGELONE",
+      "ANTHEM","ANURAS","APARINDS","APOLLOHOSP","APOLLOTYRE","APTUS","ASAHIINDIA","ASHOKLEY","ASIANPAINT","ASTERDM",
+      "ASTRAL","ATHERENERG","ATUL","AUROPHARMA","AIIL","DMART","AXISBANK","BEML","BLS","BSE",
+      "BAJAJ-AUTO","BAJFINANCE","BAJAJFINSV","BAJAJHLDNG","BAJAJHFL","BALKRISIND","BALRAMCHIN","BANDHANBNK","BANKBARODA","BANKINDIA",
+      "MAHABANK","BATAINDIA","BAYERCROP","BELRISE","BERGEPAINT","BDL","BEL","BHARATFORG","BHEL","BPCL",
+      "BHARTIARTL","BHARTIHEXA","BIKAJI","GROWW","BIOCON","BSOFT","BLUEDART","BLUEJET","BLUESTARCO","BBTC",
+      "BOSCHLTD","FIRSTCRY","BRIGADE","BRITANNIA","MAPMYINDIA","CCL","CESC","CGPOWER","CIEINDIA","CRISIL",
+      "CANFINHOME","CANBK","CANHLIFE","CAPLIPOINT","CGCL","CARBORUNIV","CARTRADE","CASTROLIND","CEATLTD","CEMPRO",
+      "CENTRALBK","CDSL","CHALET","CHAMBLFERT","CHENNPETRO","CHOICEIN","CHOLAHLDNG","CHOLAFIN","CIPLA","CUB",
+      "CLEAN","COALINDIA","COCHINSHIP","COFORGE","COHANCE","COLPAL","CAMS","CONCORDBIO","CONCOR","COROMANDEL",
+      "CRAFTSMAN","CREDITACC","CROMPTON","CUMMINSIND","CYIENT","DCMSHRIRAM","DLF","DOMS","DABUR","DALBHARAT",
+      "DATAPATTNS","DEEPAKFERT","DEEPAKNTR","DELHIVERY","DEVYANI","DIVISLAB","DIXON","LALPATHLAB","DRREDDY","EIDPARRY",
+      "EIHOTEL","EICHERMOT","ELECON","ELGIEQUIP","EMAMILTD","EMCURE","EMMVEE","ENDURANCE","ENGINERSIN","ERIS",
+      "ESCORTS","ETERNAL","EXIDEIND","NYKAA","FEDERALBNK","FACT","FINCABLES","FSL","FIVESTAR","FORCEMOT",
+      "FORTIS","GAIL","GVT&D","GMRAIRPORT","GABRIEL","GALLANTT","GRSE","GICRE","GILLETTE","GLAND",
+      "GLAXO","GLENMARK","MEDANTA","GODIGIT","GPIL","GODFRYPHLP","GODREJCP","GODREJIND","GODREJPROP","GRANULES",
+      "GRAPHITE","GRASIM","GRAVITA","GESHIP","FLUOROCHEM","GMDCLTD","HEG","HBLENGINE","HCLTECH","HDBFS",
+      "HDFCAMC","HDFCBANK","HDFCLIFE","HFCL","HAVELLS","HEROMOTOCO","HEXT","HSCL","HINDALCO","HAL",
+      "HINDCOPPER","HINDPETRO","HINDUNILVR","HINDZINC","POWERINDIA","HOMEFIRST","HONASA","HONAUT","HUDCO","HYUNDAI",
+      "ICICIBANK","ICICIGI","ICICIAMC","ICICIPRULI","IDBI","IDFCFIRSTB","IFCI","IIFL","IRB","IRCON",
+      "ITCHOTELS","ITC","ITI","INDGN","INDIACEM","INDIAMART","INDIANB","IEX","INDHOTEL","IOC",
+      "IOB","IRCTC","IRFC","IREDA","IGL","INDUSTOWER","INDUSINDBK","NAUKRI","INFY","INOXWIND",
+      "INTELLECT","INDIGO","IGIL","IKS","IPCALAB","JKCEMENT","JBMA","JKTYRE","JMFINANCIL","JSWCEMENT",
+      "JSWDULUX","JSWENERGY","JSWINFRA","JSWSTEEL","JAINREC","JPPOWER","J&KBANK","JINDALSAW","JSL","JINDALSTEL",
+      "JIOFIN","JUBLFOOD","JUBLINGREA","JUBLPHARMA","JWL","JYOTICNC","KPRMILL","KEI","KPITTECH","KAJARIACER",
+      "KPIL","KALYANKJIL","KARURVYSYA","KAYNES","KEC","KFINTECH","KIRLOSENG","KOTAKBANK","KIMS","LTF",
+      "LTTS","LGEINDIA","LICHSGFIN","LTFOODS","LTM","LT","LATENTVIEW","LAURUSLABS","THELEELA","LEMONTREE",
+      "LENSKART","LICI","LINDEINDIA","LLOYDSME","LODHA","LUPIN","MMTC","MRF","MGL","M&MFIN",
+      "M&M","MANAPPURAM","MRPL","MANKIND","MARICO","MARUTI","MFSL","MAXHEALTH","MAZDOCK","MEESHO",
+      "MINDACORP","MSUMI","MOTILALOFS","MPHASIS","MCX","MUTHOOTFIN","NATCOPHARM","NBCC","NCC","NHPC",
+      "NLCINDIA","NMDC","NSLNISP","NTPCGREEN","NTPC","NH","NATIONALUM","NAVA","NAVINFLUOR","NESTLEIND",
+      "NETWEB","NEULANDLAB","NEWGEN","NAM-INDIA","NIVABUPA","NUVAMA","NUVOCO","OBEROIRLTY","ONGC","OIL",
+      "OLAELEC","OLECTRA","PAYTM","ONESOURCE","OFSS","POLICYBZR","PCBL","PGEL","PIIND","PNBHOUSING",
+      "PTCIL","PVRINOX","PAGEIND","PARADEEP","PATANJALI","PERSISTENT","PETRONET","PFIZER","PHOENIXLTD","PWL",
+      "PIDILITIND","PINELABS","PIRAMALFIN","PPLPHARMA","POLYMED","POLYCAB","POONAWALLA","PFC","POWERGRID","PREMIERENE",
+      "PRESTIGE","PFOCUS","PNB","RRKABEL","RBLBANK","RECLTD","RHIM","RITES","RADICO","RVNL",
+      "RAILTEL","RAINBOW","RKFORGE","REDINGTON","RELIANCE","RPOWER","SBFC","SBICARD","SBILIFE","SJVN",
+      "SRF","SAGILITY","SAILIFE","SAMMAANCAP","MOTHERSON","SAPPHIRE","SARDAEN","SAREGAMA","SCHAEFFLER","SCHNEIDER",
+      "SCI","SHREECEM","SHRIRAMFIN","SHYAMMETL","ENRIN","SIEMENS","SIGNATURE","SOBHA","SOLARINDS","SONACOMS",
+      "SONATSOFTW","STARHEALTH","SBIN","SAIL","SUMICHEM","SUNPHARMA","SUNTV","SUNDARMFIN","SUPREMEIND","SPLPETRO",
+      "SUZLON","SWANCORP","SWIGGY","SYNGENE","SYRMA","TBOTEK","TVSMOTOR","TATACAP","TATACHEM","TATACOMM",
+      "TCS","TATACONSUM","TATAELXSI","TATAINVEST","TMCV","TMPV","TATAPOWER","TATASTEEL","TATATECH","TTML",
+      "TECHM","TECHNOE","TEGA","TEJASNET","TENNIND","NIACL","RAMCOCEM","THERMAX","TIMKEN","TITAGARH",
+      "TITAN","TORNTPHARM","TORNTPOWER","TARIL","TRAVELFOOD","TRENT","TRIDENT","TRITURBINE","TIINDIA","UCOBANK",
+      "UNOMINDA","UPL","UTIAMC","ULTRACEMCO","UNIONBANK","UBL","UNITDSPR","URBANCO","USHAMART","VTL",
+      "VBL","VEDL","VIJAYA","VMM","IDEA","VOLTAS","WAAREEENER","WELCORP","WELSPUNLIV","WHIRLPOOL","WIPRO",
+      "WOCKPHARMA","YESBANK","ZFCVINDIA","ZEEL","ZENTEC","ZENSARTECH","ZYDUSLIFE","ZYDUSWELL","ECLERX"
+    ];
+
+    const ignoredSymbols = new Set(["NIFTY", "NIFTY50", "NIFTY 50", "BANKNIFTY", "^NSEI", "^NSEBANK"]);
+
+    const allSymbolSet = new Set([...fundamentalTickers, ...defaultNifty500]);
+
+    const allCandidates = [];
+    allSymbolSet.forEach(ticker => {
+      const clean = ticker.trim().toUpperCase();
+      if (ignoredSymbols.has(clean)) return;
+      if (fundamentalTickers.includes(clean)) {
+        const candidate = computeCandidate(clean);
+        if (candidate) allCandidates.push(candidate);
+      } else {
+        allCandidates.push(computeTechnicalOnlyCandidate(clean, snapshotByTicker[clean]));
+      }
+    });
+
+    const fullRatingCount = allCandidates.filter(c => c.isFullRating).length;
+    const techOnlyCount = allCandidates.filter(c => !c.isFullRating).length;
+
     const sortOptions = [
       { key: "overall", label: "Sort: Overall score" },
       { key: "businessQuality", label: "Sort: Business Quality" },
       { key: "financialStrength", label: "Sort: Financial Strength" },
       { key: "valuation", label: "Sort: Valuation" },
+      { key: "technicalTrend", label: "Sort: Technical Score" },
       { key: "risk", label: "Sort: Risk" }
     ];
 
     container.innerHTML = `
       <div class="module-header">
-        <h2>Delivery Screener</h2>
-        <p class="module-sub">Which companies deserve closer study this week — not a buy/sell signal, a shortlist to start from.</p>
+        <h2>Delivery Screener — Searchable Nifty 500 Universe</h2>
+        <p class="module-sub">Rank delivery candidates across 5 pillars, or search all 500 Nifty 500 constituents (e.g. DIXON).</p>
       </div>
       <div class="panel" id="ds-price-import-panel" style="margin-bottom:20px;max-width:none;">
         <div class="section-head" style="margin-bottom:12px;"><span class="section-title" style="font-size:15px;">Price History Data Center</span></div>
-        <p class="module-sub" style="margin-bottom:14px;">Auto-Sync free public EOD historical closes (no broker login or CSV file required), or choose a local OHLCV CSV file as a fallback.</p>
-        <div class="field-row"><label for="ds-price-symbol">Ticker (optional; leave blank to sync all Nifty 500 constituents)</label><input type="text" id="ds-price-symbol" style="text-transform:uppercase" placeholder="e.g. TCS or TCS.NS"></div>
+        <p class="module-sub" style="margin-bottom:14px;">Auto-Sync free public EOD historical closes for all 500 Nifty 500 constituents (no broker login or CSV required).</p>
+        <div class="field-row"><label for="ds-price-symbol">Ticker (leave blank to sync all 500 Nifty 500 constituents)</label><input type="text" id="ds-price-symbol" style="text-transform:uppercase" placeholder="e.g. DIXON or TCS"></div>
         <div class="field-row"><label for="ds-price-file">CSV file (manual fallback)</label><input type="file" id="ds-price-file" accept=".csv,text/csv"></div>
         <div class="paper-action-row" style="margin-top:10px;">
           <button class="btn" id="ds-price-autosync-btn" style="background:var(--gain);color:#fff;">⚡ Sync Nifty 500 Public Prices</button>
@@ -245,42 +355,223 @@ const DeliveryScreenerModule = (function () {
         <div class="module-sub" id="ds-price-import-result" style="margin-top:10px;"></div>
       </div>
       <div class="specimen">
-        <h2>Reading this screen</h2>
-        <p>Five pillars, always visible: Business Quality, Financial Strength, Valuation, Technical Trend, Risk. Technical Trend uses free public OHLCV data or a local CSV file. Missing or limited history keeps the assessment partial and prevents the highest recommendation; 200 or more valid rows completes the five-pillar model.</p>
-        <p class="final">Ranked from your ${allCandidates.length} companies with fundamentals data. A company with no fundamentals data can't be ranked — add it in Fundamentals first.</p>
+        <h2>Rating Integrity & Nifty 500 Coverage</h2>
+        <p><strong>Full Rating (${fullRatingCount} enrolled):</strong> Complete 5-pillar fundamental ranking (Business Quality, Financial Strength, Valuation, Technical Trend, Risk).</p>
+        <p><strong>Technical-Only (${techOnlyCount} stocks):</strong> Technical coverage is shown only when validated OHLCV history is available. To unlock a full 5-pillar rating for a stock such as <em>DIXON</em>, enroll its verified financial ratios in Fundamentals.</p>
       </div>
-      ${ListControls.renderControlsBar("ds-controls", ListControls.uniqueSectors(allCandidates, c => c.security && c.security.sector), sortOptions, "overall")}
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px;background:var(--bg-ticket);padding:14px;border:1px solid var(--rule-bright);">
+        <input type="text" id="ds-search-input" placeholder="🔍 Search ticker (e.g. DIXON, TCS)..." style="flex:1;min-width:200px;min-height:var(--touch);padding:0 12px;background:var(--bg-raised);border:1px solid var(--rule-bright);color:var(--paper);font-family:var(--mono);">
+        <select id="ds-universe-filter" style="min-height:var(--touch);padding:0 12px;background:var(--bg-raised);border:1px solid var(--rule-bright);color:var(--paper);font-family:var(--mono);">
+          <option value="all">Universe: All Nifty 500 (${allCandidates.length})</option>
+          <option value="full">Full Rating (${fullRatingCount} enrolled)</option>
+          <option value="technical">Technical-Only (${techOnlyCount})</option>
+          <option value="missing">Data Missing</option>
+          <option value="failed">Sync Failed</option>
+        </select>
+        <select id="ds-sort-select" style="min-height:var(--touch);padding:0 12px;background:var(--bg-raised);border:1px solid var(--rule-bright);color:var(--paper);font-family:var(--mono);">
+          ${sortOptions.map(opt => `<option value="${opt.key}">${opt.label}</option>`).join("")}
+        </select>
+      </div>
+
       <div id="ds-list"></div>
-      <button class="btn" id="ds-show-more" style="display:none;background:transparent;border:1px solid var(--rule-bright);color:var(--paper-dim);margin-top:14px;">Show 20 more</button>
+      <button class="btn" id="ds-show-more" style="display:none;background:transparent;border:1px solid var(--rule-bright);color:var(--paper-dim);margin-top:14px;width:100%;">Show 20 more</button>
     `;
 
-    const state = { searchText: "", sector: "All", sortKey: "overall", sortDir: "desc" };
+    const state = { searchText: "", filterType: "all", sortKey: "overall" };
     let visibleCount = PAGE_SIZE;
 
+    const listEl = container.querySelector("#ds-list");
+    const showMoreBtn = container.querySelector("#ds-show-more");
+    const searchInput = container.querySelector("#ds-search-input");
+    const filterSelect = container.querySelector("#ds-universe-filter");
+    const sortSelect = container.querySelector("#ds-sort-select");
     const fileInput = container.querySelector("#ds-price-file");
     const symbolInput = container.querySelector("#ds-price-symbol");
+
+    function renderFilteredList() {
+      let filtered = allCandidates.filter(c => {
+        if (state.searchText) {
+          const query = state.searchText.toLowerCase();
+          const matchTicker = c.ticker.toLowerCase().includes(query);
+          const matchName = (c.security.name || "").toLowerCase().includes(query);
+          if (!matchTicker && !matchName) return false;
+        }
+        if (state.filterType === "full") return c.isFullRating;
+        if (state.filterType === "technical") return !c.isFullRating;
+        if (state.filterType === "missing") return c.assessment === "Data Missing" || c.assessment === "Waiting for price history data";
+        if (state.filterType === "failed") return c.validationStatus === "FAILED" || c.validationStatus === "INVALID";
+        return true;
+      });
+
+      filtered.sort((a, b) => {
+        if (state.sortKey === "overall") {
+          if (a.isFullRating && !b.isFullRating) return -1;
+          if (!a.isFullRating && b.isFullRating) return 1;
+          if (a.isFullRating) return (b.overall || 0) - (a.overall || 0);
+          const aTech = (a.pillars.technicalTrend && a.pillars.technicalTrend.score) || 0;
+          const bTech = (b.pillars.technicalTrend && b.pillars.technicalTrend.score) || 0;
+          return bTech - aTech;
+        }
+        const aScore = (a.pillars[state.sortKey] && a.pillars[state.sortKey].score) || 0;
+        const bScore = (b.pillars[state.sortKey] && b.pillars[state.sortKey].score) || 0;
+        return bScore - aScore;
+      });
+
+      const slice = filtered.slice(0, visibleCount);
+      if (slice.length === 0) {
+        listEl.innerHTML = `<div class="paper-empty-message" style="padding:20px;text-align:center;color:var(--paper-dim);">No stocks match your search/filter criteria.</div>`;
+        showMoreBtn.style.display = "none";
+        return;
+      }
+
+      listEl.innerHTML = slice.map((c, index) => {
+        if (c.isFullRating) {
+          return renderCard(c, index + 1);
+        } else {
+          const tech = c.pillars.technicalTrend;
+          const metrics = tech.metrics || {};
+          const techScoreDisplay = tech && tech.score !== null ? `${tech.score}/100` : "N/A";
+          return `
+            <div class="ticket" style="margin-bottom:16px;border-left:4px solid var(--amber);">
+              <div class="ticket-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                <div>
+                  <span class="ticket-ticker">${c.ticker}</span>
+                  <span style="font-size:12px;color:var(--paper-dim);margin-left:8px;">${c.security.name || ''}</span>
+                </div>
+                <span class="sync-health-pill sync-health-stale">Technical-only — fundamentals not enrolled</span>
+              </div>
+              <div class="ticket-body">
+                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(140px, 1fr));gap:8px;margin-bottom:10px;font-family:var(--mono);font-size:12px;">
+                  <div><strong>Latest Close:</strong> ${c.latestPrice ? `₹${c.latestPrice.toFixed(2)}` : '—'}</div>
+                  <div><strong>Market Date:</strong> ${c.latestDate || '—'}</div>
+                  <div><strong>Technical Score:</strong> ${techScoreDisplay}</div>
+                  <div><strong>OHLCV History:</strong> ${c.rowCount} rows</div>
+                  <div><strong>50 DMA:</strong> ${formatMetric(metrics.dma50, "", 2)}</div>
+                  <div><strong>200 DMA:</strong> ${formatMetric(metrics.dma200, "", 2)}</div>
+                  <div><strong>RSI 14:</strong> ${formatMetric(metrics.rsi14)}</div>
+                  <div><strong>52W High Distance:</strong> ${formatMetric(metrics.distanceFrom52WeekHigh, "%")}</div>
+                  <div><strong>Volume / 20D:</strong> ${formatMetric(metrics.latestVolumeVs20DayAverage, "x", 2)}</div>
+                </div>
+                <div style="font-size:11px;color:var(--paper-dim);margin-top:6px;">
+                  ${c.risks[0]}
+                </div>
+              </div>
+            </div>
+          `;
+        }
+      }).join("");
+
+      listEl.querySelectorAll("[data-expand]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const target = listEl.querySelector(`#${btn.dataset.expand}`);
+          const isOpen = target.style.display !== "none";
+          target.style.display = isOpen ? "none" : "block";
+          btn.textContent = isOpen ? "Show breakdown ▾" : "Hide breakdown ▴";
+        });
+      });
+      listEl.querySelectorAll("[data-import-price]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          symbolInput.value = btn.dataset.importPrice;
+          fileInput.click();
+        });
+      });
+      listEl.querySelectorAll("[data-paper-buy]").forEach(btn => {
+        btn.addEventListener("click", () => openPaperBuy(btn.dataset.paperBuy));
+      });
+
+      if (visibleCount < filtered.length) {
+        showMoreBtn.style.display = "block";
+        showMoreBtn.textContent = `Show 20 more (showing ${slice.length} of ${filtered.length})`;
+      } else {
+        showMoreBtn.style.display = "none";
+      }
+    }
+
+    searchInput.addEventListener("input", (e) => {
+      state.searchText = e.target.value;
+      visibleCount = PAGE_SIZE;
+      renderFilteredList();
+    });
+
+    filterSelect.addEventListener("change", (e) => {
+      state.filterType = e.target.value;
+      visibleCount = PAGE_SIZE;
+      renderFilteredList();
+    });
+
+    sortSelect.addEventListener("change", (e) => {
+      state.sortKey = e.target.value;
+      visibleCount = PAGE_SIZE;
+      renderFilteredList();
+    });
+
+    showMoreBtn.addEventListener("click", () => {
+      visibleCount += PAGE_SIZE;
+      renderFilteredList();
+    });
+
+    renderFilteredList();
+
+    let pollInterval = null;
 
     async function handlePublicSync(endpoint = "/api/sync-public-prices", retryOnly = false) {
       const resultEl = container.querySelector("#ds-price-import-result");
       const targetTicker = symbolInput.value.trim().toUpperCase();
-      const targetList = targetTicker ? [targetTicker] : null;
+
       App.showStatus(`Syncing public market data...`, "ok");
-      if (resultEl) resultEl.textContent = "Connecting to local market data server...";
+      if (resultEl) {
+        resultEl.innerHTML = `
+          <div class="sync-status-box">
+            <div><strong>Starting Nifty 500 Sync...</strong></div>
+            <div style="font-size:11px;color:var(--paper-dim);">Connecting to local application server...</div>
+          </div>
+        `;
+      }
+
+      pollInterval = setInterval(async () => {
+        try {
+          const statusRes = await fetch("/api/public-sync-status");
+          if (statusRes.ok) {
+            const statusData = await statusRes.json();
+            const s = statusData.status || {};
+            if (s.is_syncing && resultEl) {
+              const comp = s.completed_count || 0;
+              const tot = s.total_tickers || 502;
+              const pct = tot > 0 ? Math.round((comp / tot) * 100) : 0;
+              resultEl.innerHTML = `
+                <div class="sync-status-box">
+                  <div><strong>Syncing Nifty 500 Public Prices...</strong> (${comp} of ${tot} symbols)</div>
+                  <div>Elapsed: ${s.elapsed_seconds || 0}s | Current: <strong>${s.current_symbol || 'Processing'}</strong></div>
+                  <div style="background:var(--rule);height:6px;width:100%;margin-top:6px;border-radius:3px;overflow:hidden;">
+                    <div style="background:var(--gain);height:100%;width:${pct}%;"></div>
+                  </div>
+                </div>
+              `;
+            }
+          }
+        } catch (e) {}
+      }, 1000);
+
       try {
+        const bodyObj = targetTicker ? { tickers: [targetTicker] } : {};
         const response = await fetch(endpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ tickers: targetList })
+          body: JSON.stringify(bodyObj)
         });
         if (!response.ok) throw new Error(`HTTP ${response.status} - Sync service unavailable`);
         const data = await response.json();
+
+        clearInterval(pollInterval);
+
         const snapshot = data.snapshot || {};
         const snapshotTickers = snapshot.tickers || {};
 
         let importedCount = 0;
         let latestDateFound = "—";
         for (const [sym, item] of Object.entries(snapshotTickers)) {
-          if ((!targetList || targetList.includes(sym)) && item.valid && item.validation_status === "VALID" && item.rows && item.rows.length >= 200) {
+          if (item.valid && item.validation_status === "VALID" && item.rows && item.rows.length >= 200) {
             WealthData.setPriceHistory(sym, {
               symbol: sym,
               sourceSymbol: item.provider_ticker || sym,
@@ -292,22 +583,14 @@ const DeliveryScreenerModule = (function () {
           }
         }
         await App.saveNow(false);
-        App.showStatus(`Synced ${importedCount} public price histories. Latest date: ${latestDateFound}`, "ok");
-        renderScreener(container);
+        App.showStatus(`Synced ${importedCount} price histories. Latest date: ${latestDateFound}`, "ok");
+        await renderScreener(container);
         const refreshedResult = container.querySelector("#ds-price-import-result");
         if (refreshedResult) {
-          const succ = data.successful ?? importedCount;
-          const fail = data.failed || 0;
-          const stale = data.stale || 0;
-          refreshedResult.innerHTML = `
-            <div class="sync-status-box">
-              <div><strong>Sync Complete:</strong> Successful: ${succ} · Failed: ${fail} · Stale: ${stale}</div>
-              <div><strong>Latest Market Date:</strong> ${latestDateFound}</div>
-              ${fail > 0 ? `<div style="color:var(--loss);">Failed tickers: ${(data.failed_tickers || []).join(", ")}</div>` : ""}
-            </div>
-          `;
+          refreshedResult.innerHTML = `<div class="sync-status-box"><strong>Sync complete:</strong> ${data.successful || 0} successful · ${data.failed || 0} failed · ${data.stale || 0} stale · ${data.elapsed_seconds || 0}s</div>`;
         }
       } catch (error) {
+        clearInterval(pollInterval);
         App.showStatus("Public sync failed: " + error.message, "error");
         if (resultEl) resultEl.textContent = "Sync error: " + error.message;
       }
@@ -345,52 +628,6 @@ const DeliveryScreenerModule = (function () {
         resultEl.textContent = error.message;
       }
     });
-
-    function refreshList() {
-      const filtered = ListControls.filterAndSort(allCandidates, {
-        searchText: state.searchText, sector: state.sector, sortKey: state.sortKey, sortDir: state.sortDir,
-        getSearchable: c => c.ticker + " " + (c.security ? c.security.displayName : ""),
-        getSector: c => c.security && c.security.sector,
-        getSortValue: (c, key) => key === "overall" ? c.overall : c.pillars[key].score
-      });
-
-      container.querySelector("#ds-controls-count").textContent = `${filtered.length} of ${allCandidates.length} companies`;
-
-      const listEl = container.querySelector("#ds-list");
-      const toShow = filtered.slice(0, visibleCount);
-      listEl.innerHTML = toShow.length
-        ? toShow.map((c, i) => renderCard(c, i + 1)).join("")
-        : `<div class="module-sub" style="font-style:italic;padding:20px 0;text-align:center;">No companies match this search/filter.</div>`;
-
-      const moreBtn = container.querySelector("#ds-show-more");
-      moreBtn.style.display = filtered.length > visibleCount ? "block" : "none";
-      moreBtn.textContent = `Show 20 more (${filtered.length - visibleCount} remaining)`;
-
-      listEl.querySelectorAll("[data-expand]").forEach(btn => {
-        btn.addEventListener("click", () => {
-          const target = listEl.querySelector(`#${btn.dataset.expand}`);
-          const isOpen = target.style.display !== "none";
-          target.style.display = isOpen ? "none" : "block";
-          btn.textContent = isOpen ? "Show breakdown ▾" : "Hide breakdown ▴";
-        });
-      });
-      listEl.querySelectorAll("[data-import-price]").forEach(btn => {
-        btn.addEventListener("click", () => {
-          symbolInput.value = btn.dataset.importPrice;
-          fileInput.click();
-          container.querySelector("#ds-price-import-panel").scrollIntoView({ behavior: "smooth", block: "start" });
-        });
-      });
-      listEl.querySelectorAll("[data-paper-buy]").forEach(btn => {
-        btn.addEventListener("click", () => {
-          openPaperBuy(btn.dataset.paperBuy);
-        });
-      });
-    }
-
-    container.querySelector("#ds-show-more").addEventListener("click", () => { visibleCount += PAGE_SIZE; refreshList(); });
-    ListControls.wireControls(container, "ds-controls", state, () => { visibleCount = PAGE_SIZE; refreshList(); });
-    refreshList();
   }
 
   function pillarRow(label, pillar) {

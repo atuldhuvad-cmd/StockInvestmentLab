@@ -47,8 +47,14 @@ class FakeProvider:
         self.results = results
         self.symbol_map = {symbol: f"{symbol}.NS" for symbol in results}
 
-    def download_daily(self, symbols, period="1y"):
-        return {symbol: self.results[symbol] for symbol in symbols}
+    def download_daily(self, symbols, period="1y", progress_callback=None):
+        output = {}
+        total = len(symbols)
+        for completed, symbol in enumerate(symbols, start=1):
+            output[symbol] = self.results[symbol]
+            if progress_callback:
+                progress_callback(completed, total, symbol, 0)
+        return output
 
 
 class PublicSyncTests(unittest.TestCase):
@@ -140,6 +146,53 @@ class PublicSyncTests(unittest.TestCase):
             result = fetcher.sync_public_prices(["TCS"], retry_failed_only=True)
         self.assertEqual(result["successful"], 1)
         self.assertEqual(result["snapshot"]["tickers"]["TCS"]["validation_status"], "VALID")
+
+    def test_dixon_verification_and_pruning_on_full_sync(self):
+        universe = fetcher.load_default_universe()
+        self.assertIn("DIXON", universe)
+        self.assertEqual(len(universe), 502) # 500 equities + 2 benchmarks
+
+        # Setup snapshot with obsolete ticker
+        old_snapshot = {
+            "version": "1.0.0",
+            "tickers": {
+                "OBSOLETE_SYMBOL": {"ticker": "OBSOLETE_SYMBOL", "valid": True, "rows": valid_rows()},
+                "DIXON": {"ticker": "DIXON", "valid": True, "rows": valid_rows()}
+            }
+        }
+        validator.atomic_save_snapshot(old_snapshot)
+
+        # 1. Targeted sync preserves OBSOLETE_SYMBOL
+        fake_targeted = FakeProvider({"DIXON": {"ok": True, "error": None, "rows": valid_rows(), "provider_symbol": "DIXON.NS"}})
+        with patch.object(fetcher, "YFinanceProvider", return_value=fake_targeted):
+            res_target = fetcher.sync_public_prices(["DIXON"])
+        self.assertIn("OBSOLETE_SYMBOL", res_target["snapshot"]["tickers"])
+
+        # 2. Full sync prunes OBSOLETE_SYMBOL and contains exactly 502 configured records
+        all_fake_dict = {sym: {"ok": True, "error": None, "rows": valid_rows(), "provider_symbol": f"{sym}.NS"} for sym in universe}
+        fake_full = FakeProvider(all_fake_dict)
+        with patch.object(fetcher, "YFinanceProvider", return_value=fake_full):
+            res_full = fetcher.sync_public_prices()
+        self.assertNotIn("OBSOLETE_SYMBOL", res_full["snapshot"]["tickers"])
+        self.assertEqual(len(res_full["snapshot"]["tickers"]), 502)
+        self.assertIn("DIXON", res_full["snapshot"]["tickers"])
+        self.assertIn("NIFTY", res_full["snapshot"]["tickers"])
+        self.assertIn("BANKNIFTY", res_full["snapshot"]["tickers"])
+
+    def test_progress_status_reaches_completed_state(self):
+        results = {
+            symbol: {"ok": True, "error": None, "rows": valid_rows(), "provider_symbol": f"{symbol}.NS"}
+            for symbol in ("TCS", "DIXON")
+        }
+        with patch.object(fetcher, "YFinanceProvider", return_value=FakeProvider(results)):
+            fetcher.sync_public_prices(["TCS", "DIXON"])
+        with open(validator.SYNC_STATUS_PATH, "r", encoding="utf-8") as source:
+            status = json.load(source)
+        self.assertFalse(status["is_syncing"])
+        self.assertEqual(status["completed_count"], 2)
+        self.assertEqual(status["total_tickers"], 2)
+        self.assertEqual(status["current_symbol"], "Done")
+
 
     def test_server_read_endpoints_and_write_guard(self):
         server.SYNC_STATUS_PATH = validator.SYNC_STATUS_PATH

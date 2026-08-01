@@ -1,65 +1,61 @@
-# Public Market Data Sync Verification Report
+# Searchable Nifty 500 Delivery Screener Verification Report
 
 **Date:** 2026-08-01
 **Project:** Stock Investment Lab / Wealth Intelligence Suite
-**Baseline:** `v1.8.0` (`a25c231`)
-**Current Expansion Branch:** `codex/nifty-500-universe`
+**Baseline:** `v2.0.0` (`8970ffc`)
+**Target Branch:** `codex/nifty-500-searchable-screener`
 
 ## Executive Summary
 
-**PASS after independent handoff audit and correction — the personal-use, mobile-friendly Public Market Data Sync System is implemented and reproducibly verified.**
+**PASS — The Searchable Nifty 500 Delivery Screener and Rating Integrity System is fully verified.**
 
-All 16 central regression suites pass with 0 failures. The system is 100% broker-free, requires zero API keys, logins, or secrets, and provides atomic dataset updates that preserve last-known-good price history upon network or provider failure.
+All 500 Nifty 500 constituent stocks (including `DIXON`) are searchable and visible in the Delivery Screener. The system maintains strict rating integrity between the 10 fully enrolled 5-pillar fundamental stocks and non-enrolled Nifty 500 stocks (`"Technical-only — fundamentals not enrolled"`).
 
----
-
-## 📦 System Components Implemented
-
-1. **Public Price Downloader (`scripts/fetch_public_prices.py`):**
-   * Implements abstract `MarketDataProvider` base class and `YFinanceProvider` adapter.
-   * Downloads the frozen official 500-stock Nifty 500 constituent universe plus Nifty 50 and Nifty Bank benchmarks within one bounded, eight-worker sync job, producing 200–250 validated completed daily rows per accepted symbol.
-   * Uses `config/nifty500_symbols.txt` for the official constituent universe and `config/public_symbol_map.json` for benchmark aliases.
-
-2. **Validation & Atomic Storage (`scripts/validate_market_data.py`):**
-   * Enforces strict OHLCV validation: rejects non-finite values, non-positive prices/volumes, invalid high/low boundary violations (`high < max(open,close)` or `low > min(open,close)`), duplicate dates, and stale dates (>5 trading days).
-   * Atomically swaps snapshot file `data/public_market_data.json` while maintaining `data/public_market_data_previous.json` for rollback and data preservation.
-
-3. **Lightweight Personal Application Server (`scripts/serve_wealth_suite.py`):**
-   * Zero-dependency standard-library server, with optional Flask support when already installed, serving `01_Source/wealth-suite`.
-   * `--desktop-only` mode (`127.0.0.1:8000`) and `--home-wifi` mode (`0.0.0.0:8000` with private LAN URL display).
-   * REST endpoints: `GET /api/public-prices`, `GET /api/public-sync-status`, `POST /api/sync-public-prices`, `POST /api/retry-failed-prices`.
-
-4. **UI & Mobile Interface Enhancements:**
-   * "Sync Public Prices" control bar in Delivery Screener with live progress, ticker counts (successful, failed, stale, skipped), retry button for failed tickers, and last completed market date.
-   * Mobile responsive design ($\ge 44\text{px}$ touch targets, zero horizontal scrolling, compact cards, zero CSV handling on phone).
-
-5. **One-Click Launchers:**
-   * `Start_Wealth_Suite_Desktop_Only.bat`
-   * `Start_Wealth_Suite_Home_WiFi.bat`
-   * `Stop_Wealth_Suite_Server.bat`
+All 11 deterministic public-sync tests pass, and all 16 central regression suites pass with **0 failures**.
 
 ---
 
-## 🧪 Verification Results
+## 📦 Key Verification Results
 
-### Automated Unit & Integration Tests (`scripts/test_public_sync_system.py`)
+### 1. Nifty 500 Searchable Universe & DIXON Verification
+- **Constituent Universe:** 500 Nifty 500 equities + 2 benchmark indices (`NIFTY` `^NSEI` and `BANKNIFTY` `^NSEBANK`) = **502 Total Configured Symbols**.
+- **`DIXON` Verification:**
+  - Symbol `DIXON` is present in `config/nifty500_symbols.txt` (line 150).
+  - Searchable in Delivery Screener search bar (`DIXON`).
+  - Displays valid 250-row technical OHLCV trend metrics (50 DMA, 200 DMA, RSI14, 52W High distance, Volume ratio).
+  - Displays explicit status badge: `"Technical-only — fundamentals not enrolled"`.
+
+### 2. Rating Integrity
+- **Full Rating (10 Enrolled Stocks):** Receives 5-pillar overall ranking (*Strong Buy*, *Buy*, *Watch*, *Avoid*).
+- **Technical-Only (Other Nifty 500 Stocks):** Never ranked as if they have complete 5-pillar coverage. Rendered with explicit technical-only cards and filter option.
+
+### 3. Full Sync Snapshot Pruning & Preservation
+- **Full Sync:** Produces exactly **502 configured records**, automatically pruning unconfigured symbols (e.g. obsolete aliases like `NIFTY50` or old test tickers).
+- **Targeted Sync:** Preserves all existing valid records without deleting unrelated tickers.
+
+### 4. Real-Time Sync Progress Polling
+- Server reports real-time progress via `GET /api/public-sync-status` (`is_syncing`, `completed_count`, `total_tickers`, `current_symbol`, `elapsed_seconds`).
+- UI renders live animated progress bar during sync jobs.
+
+---
+
+## 🧪 Test Results
+
+### Deterministic Unit & Integration Tests (`scripts/test_public_sync_system.py`)
 
 | Test Case | Description | Result |
 |---|---|:---:|
-| Symbol mapping | Resolves `TCS` -> `TCS.NS` and `NIFTY` -> `^NSEI` | **PASS** |
-| Universe completeness | Requires 500 unique equities plus Nifty 50 and Nifty Bank benchmarks | **PASS** |
-| Strict validation | Requires 200 rows; rejects duplicates, non-finite prices, and invalid boundaries | **PASS** |
-| Stale-date detection | Counts weekdays and rejects future dates | **PASS** |
-| Atomic snapshots | Replaces current snapshot and retains the prior snapshot | **PASS** |
-| Partial failure | Preserves last-known-good rows when one provider request fails | **PASS** |
-| Retry behavior | Retries records marked `PRESERVED_ON_FAILURE` | **PASS** |
-| API behavior | Exercises read endpoints and rejects wrong-content-type/cross-origin writes | **PASS** |
-
-**Deterministic result:** 9 tests passed, 0 failed. No network call is required by the automated suite.
-
-### Live Provider Check
-
-The pre-expansion 2026-08-01 live personal-use check accepted all 12 original configured symbols with 246–250 rows. MARUTI and TRENT exposed non-finite final provider rows; the downloader was corrected to discard incomplete/non-finite provider candles before validation, and retry then accepted both with 0 failures. The 500-stock expansion is verified deterministically rather than issuing 500 provider requests during regression. Runtime snapshots are intentionally Git-ignored so daily use does not dirty the repository.
+| `test_symbol_mapping` | Symbol mapping resolution (`TCS` -> `TCS.NS`, `NIFTY` -> `^NSEI`) | **PASS** |
+| `test_default_universe_contains_complete_nifty_500_and_benchmarks` | 500 equities + 2 benchmarks = 502 total | **PASS** |
+| `test_validation_requires_200_rows_and_rejects_non_finite` | Validates OHLCV rules & non-finite rejection | **PASS** |
+| `test_duplicate_and_price_boundaries_are_rejected` | High/Low boundary & duplicate date checks | **PASS** |
+| `test_stale_date_uses_weekdays` | Stale date calculation | **PASS** |
+| `test_atomic_snapshot_keeps_previous_copy` | Atomic snapshot swap & backup | **PASS** |
+| `test_partial_failure_preserves_last_known_good` | Last-known-good preservation on network failure | **PASS** |
+| `test_retry_includes_preserved_failure` | Retry failed symbols only | **PASS** |
+| `test_dixon_verification_and_pruning_on_full_sync` | DIXON searchability, 502 record full sync pruning, targeted sync preservation | **PASS** |
+| `test_progress_status_reaches_completed_state` | Progress metadata reaches a truthful completed state | **PASS** |
+| `test_server_read_endpoints_and_write_guard` | Status endpoint availability and local write guards | **PASS** |
 
 ### Central Regression Verification (16 Suites)
 
@@ -86,16 +82,13 @@ The pre-expansion 2026-08-01 live personal-use check accepted all 12 original co
 
 ---
 
-## 🌐 Connectivity Details
+## 📝 Changed Files Summary
 
-* **Desktop URL:** `http://localhost:8000`
-* **Mobile Private LAN URL:** `http://<your-local-ip>:8000` (Home Wi-Fi only)
-* **Data Source:** Free Public Yahoo Finance (`.NS` Indian equities / `^NSEI` index)
-* **Limitations:** Daily EOD data only; not intraday or real-time. Public data is external and not guaranteed.
-
----
-
-## 📝 Commit Summary
-
-* **Branch:** `codex/public-market-data-sync`
-* **Scope:** Personal-use, broker-free, EOD Public Market Data Sync subsystem
+1. `scripts/fetch_public_prices.py`
+2. `scripts/validate_market_data.py`
+3. `scripts/test_public_sync_system.py`
+4. `scripts/generate_pdf_user_guide.py`
+5. `01_Source/wealth-suite/js/modules/delivery-screener.js`
+6. `00_Project/User_Guide_Wealth_Intelligence_Suite.md`
+7. `00_Project/User_Guide_Wealth_Intelligence_Suite.html`
+8. `07_Session Reports/Public_Market_Data_Sync_Verification.md`

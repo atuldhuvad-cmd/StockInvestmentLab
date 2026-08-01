@@ -20,6 +20,7 @@ import os
 import sys
 import json
 import math
+import time
 import urllib.request
 import urllib.error
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -177,13 +178,15 @@ class YFinanceProvider(MarketDataProvider):
 
         return self._fetch_urllib(symbol)
 
-    def download_daily(self, symbols, period="1y"):
+    def download_daily(self, symbols, period="1y", progress_callback=None):
         results = {}
         clean_symbols = list(dict.fromkeys(
             str(sym).strip().upper() for sym in symbols if str(sym).strip()
         ))
-        # A bounded worker pool keeps a 500-stock personal sync practical without
-        # flooding the free public provider or requiring enterprise job services.
+        start_t = time.time()
+        completed = 0
+        total = len(clean_symbols)
+
         with ThreadPoolExecutor(max_workers=min(8, len(clean_symbols) or 1)) as executor:
             jobs = {executor.submit(self.download_single, sym): sym for sym in clean_symbols}
             for job in as_completed(jobs):
@@ -199,6 +202,10 @@ class YFinanceProvider(MarketDataProvider):
                     "rows": rows,
                     "provider_symbol": provider_sym
                 }
+                completed += 1
+                if progress_callback:
+                    elapsed = time.time() - start_t
+                    progress_callback(completed, total, clean_sym, elapsed)
         return results
 
 def sync_public_prices(target_symbols=None, retry_failed_only=False):
@@ -210,6 +217,7 @@ def sync_public_prices(target_symbols=None, retry_failed_only=False):
     current_tickers = current_snapshot.get("tickers", {})
     provider = YFinanceProvider()
 
+    is_full_sync = target_symbols is None and not retry_failed_only
     if target_symbols is None:
         target_symbols = load_default_universe()
 
@@ -228,8 +236,36 @@ def sync_public_prices(target_symbols=None, retry_failed_only=False):
             "snapshot": current_snapshot
         }
 
-    raw_results = provider.download_daily(target_symbols)
+    total_target = len(target_symbols)
+    start_time = time.time()
+
+    def handle_progress(completed_count, total_count, current_sym, elapsed_seconds):
+        update_sync_status(
+            total=total_count,
+            successful=0,
+            failed=0,
+            stale=0,
+            skipped=0,
+            failed_tickers=[],
+            stale_tickers=[],
+            is_syncing=True,
+            completed_count=completed_count,
+            current_symbol=current_sym,
+            elapsed_seconds=elapsed_seconds
+        )
+
+    # Signal start of sync
+    handle_progress(0, total_target, "Starting...", 0)
+
+    raw_results = provider.download_daily(target_symbols, progress_callback=handle_progress)
     updated_tickers = dict(current_tickers) # Clone current tickers to preserve valid prior data
+
+    # If full universe sync, prune symbols that are no longer in the configured universe!
+    if is_full_sync:
+        configured_set = set(load_default_universe())
+        keys_to_remove = [k for k in updated_tickers if k not in configured_set]
+        for k in keys_to_remove:
+            del updated_tickers[k]
 
     successful_count = 0
     failed_count = 0
@@ -243,7 +279,6 @@ def sync_public_prices(target_symbols=None, retry_failed_only=False):
         if not res["ok"]:
             failed_count += 1
             failed_list.append(app_sym)
-            # If previous valid record exists, preserve it!
             if app_sym in current_tickers:
                 updated_tickers[app_sym]["validation_status"] = "PRESERVED_ON_FAILURE"
                 updated_tickers[app_sym]["error_message"] = res["error"]
@@ -322,9 +357,22 @@ def sync_public_prices(target_symbols=None, retry_failed_only=False):
     }
     atomic_save_snapshot(new_snapshot)
 
-    # Write status metadata
+    # Write final status metadata
     total = len(target_symbols)
-    update_sync_status(total, successful_count, failed_count, stale_count, skipped_count, failed_list, stale_list)
+    elapsed_total = time.time() - start_time
+    update_sync_status(
+        total=total,
+        successful=successful_count,
+        failed=failed_count,
+        stale=stale_count,
+        skipped=skipped_count,
+        failed_tickers=failed_list,
+        stale_tickers=stale_list,
+        is_syncing=False,
+        completed_count=total,
+        current_symbol="Done",
+        elapsed_seconds=elapsed_total
+    )
 
     return {
         "ok": True,
@@ -334,6 +382,7 @@ def sync_public_prices(target_symbols=None, retry_failed_only=False):
         "stale": stale_count,
         "failed_tickers": failed_list,
         "stale_tickers": stale_list,
+        "elapsed_seconds": round(elapsed_total, 1),
         "snapshot": new_snapshot
     }
 

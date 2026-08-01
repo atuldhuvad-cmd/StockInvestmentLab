@@ -161,12 +161,16 @@ def atomic_save_snapshot(new_snapshot_data):
     # Atomic replace
     os.replace(temp_path, SNAPSHOT_PATH)
 
-def update_sync_status(total, successful, failed, stale, skipped, failed_tickers, stale_tickers):
+def update_sync_status(total, successful, failed, stale, skipped, failed_tickers, stale_tickers, is_syncing=False, completed_count=None, current_symbol="", elapsed_seconds=0):
     """Write sync status summary metadata to public_sync_status.json."""
     os.makedirs(DATA_DIR, exist_ok=True)
-    health = "HEALTHY" if failed == 0 and stale == 0 else "DEGRADED" if successful > 0 else "FAILED"
+    health = "SYNCING" if is_syncing else ("HEALTHY" if failed == 0 and stale == 0 else "DEGRADED" if successful > 0 else "FAILED")
+    if completed_count is None:
+        completed_count = successful + failed + stale + skipped
     status_data = {
         "last_sync_timestamp": datetime.now().isoformat(),
+        "is_syncing": is_syncing,
+        "completed_count": completed_count,
         "total_tickers": total,
         "successful_count": successful,
         "failed_count": failed,
@@ -174,8 +178,12 @@ def update_sync_status(total, successful, failed, stale, skipped, failed_tickers
         "skipped_count": skipped,
         "failed_tickers": failed_tickers,
         "stale_tickers": stale_tickers,
+        "current_symbol": current_symbol,
+        "elapsed_seconds": round(elapsed_seconds, 1),
         "data_health": health
     }
-    with open(SYNC_STATUS_PATH, "w", encoding="utf-8") as f:
+    temp_path = SYNC_STATUS_PATH + ".tmp"
+    with open(temp_path, "w", encoding="utf-8") as f:
         json.dump(status_data, f, indent=2)
+    os.replace(temp_path, SYNC_STATUS_PATH)
     return status_data
