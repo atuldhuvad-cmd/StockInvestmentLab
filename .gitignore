@@ -43,6 +43,7 @@ paper-delivery-transactions-*.csv
 !/scripts/validate_market_data.py
 !/scripts/serve_wealth_suite.py
 !/scripts/test_public_sync_system.py
+!/scripts/test_fundamentals_csv.js
 
 # Runtime public-market snapshots are local state; tracked *.example.json files
 # document their shape without dirtying Git after each daily sync.

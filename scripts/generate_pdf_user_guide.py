@@ -95,6 +95,10 @@ USER_GUIDE_MD_TEXT = """# 📘 Step-by-Step User Guide: Wealth Intelligence Suit
   3. Full Rating requires verified evidence plus ROE, Debt/Equity, P/E, Revenue CAGR, and at least one qualitative moat score.
   4. Mark evidence as verified only after checking the named source. Unverified, missing, future-dated, or stale evidence cannot promote a stock.
   5. Edit operations preserve the previous manual record in enrollment history; delete requires explicit confirmation.
+  6. Use the status filter and completion sort to work through Missing, Partial, Unverified, Stale, Verified, and Full Rating candidates. Each ticker shows its missing requirements.
+  7. Use **Export CSV Template** for a blank 19-column enrollment sheet. The `DIXON` example row contains only its ticker and fiscal period; no financial values are prefilled.
+  8. Use **Import CSV** to preview Create, Update, Skip, and Reject decisions. Only commit after reviewing row-level validation messages.
+  9. CSV imports accept quoted commas and multiline evidence text, preserve blanks as missing, restrict enrollment to Nifty 500 tickers, and keep prior period revisions in append-only history.
 
 ---
 
