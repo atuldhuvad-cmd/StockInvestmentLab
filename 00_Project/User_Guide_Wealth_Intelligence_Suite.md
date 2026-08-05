@@ -53,6 +53,9 @@
   1. Record dated **BUY** and **SELL** transactions with quantity, purchase price, and asset class.
   2. Review Sector Allocation and Asset Class concentration breakdown.
   3. Realized/unrealized P&L and weighted average costs update automatically.
+  4. Review **Fundamental Risk Dashboard** alerts for active holdings with missing, partial, unverified, or stale Fundamentals evidence.
+  5. Red alerts contain genuine year-based financial flags from enrolled records; amber alerts list missing Full Rating requirements. No ratios or alerts are fabricated.
+  6. Select **Review** on an alert to open that ticker directly in Fundamentals for evidence review or CSV update.
 
 ### Step 4: Watchlist Module
 * **Purpose:** Candidate research funnel.

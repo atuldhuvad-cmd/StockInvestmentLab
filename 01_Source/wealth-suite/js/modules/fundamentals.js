@@ -116,6 +116,16 @@ const FundamentalsModule = (function () {
   const NIFTY_500_SET = new Set(NIFTY_500_TICKERS);
   if (typeof globalThis !== "undefined") globalThis.NIFTY_500_TICKERS = NIFTY_500_TICKERS;
 
+  let pendingTicker = null;
+
+  function openTicker(ticker) {
+    ticker = String(ticker || "").trim().toUpperCase();
+    if (!NIFTY_500_SET.has(ticker)) return false;
+    pendingTicker = ticker;
+    if (typeof App !== "undefined") App.switchTo("fundamentals");
+    return true;
+  }
+
   function render(container) {
     seedIfEmpty();
     const fundamentals = WealthData.get().fundamentals;
@@ -152,6 +162,12 @@ const FundamentalsModule = (function () {
 
     const state = { searchText: "", filterStatus: "all", sortBy: "ticker" };
     let selectedTicker = null;
+    if (pendingTicker) {
+      selectedTicker = pendingTicker;
+      state.searchText = pendingTicker;
+      container.querySelector("#fund-search-input").value = pendingTicker;
+      pendingTicker = null;
+    }
 
     function refreshList() {
       const allKnown = NIFTY_500_TICKERS.slice();
@@ -504,5 +520,5 @@ const FundamentalsModule = (function () {
     });
   }
 
-  return { render, formatHistoricalRoe, formatHistoricalCurrency, isNifty500Ticker: ticker => NIFTY_500_SET.has(String(ticker || "").toUpperCase()) };
+  return { render, openTicker, formatHistoricalRoe, formatHistoricalCurrency, isNifty500Ticker: ticker => NIFTY_500_SET.has(String(ticker || "").toUpperCase()) };
 })();

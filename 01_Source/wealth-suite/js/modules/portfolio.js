@@ -12,9 +12,43 @@ const PortfolioModule = (function () {
 
   const ASSET_CLASSES = ["Equity", "Gold", "Debt", "Other"];
 
+  function escapeHtml(str) {
+    if (str === null || str === undefined) return "";
+    return String(str).replace(/[&<>"']/g, char => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    })[char]);
+  }
+
+  function evaluateFundamentalHealth(holding, fundamentalsRecord) {
+    const coverage = CompanyCalculations.fundamentalCoverage(fundamentalsRecord);
+    if (!fundamentalsRecord) return { status: "Missing", severity: "amber", missing: coverage.missing, flags: [] };
+    const status = CompanyCalculations.determineReviewStatus(fundamentalsRecord);
+    let flags = [];
+    if (Array.isArray(fundamentalsRecord.years) && fundamentalsRecord.years.length > 0) {
+      flags = CompanyCalculations.detectRedFlags(fundamentalsRecord);
+    }
+    let severity = "healthy";
+    if (flags.length > 0) severity = "red";
+    else if (status !== "Eligible for Full Rating") severity = "amber";
+    return { status, severity, missing: coverage.missing || [], flags };
+  }
+
+  function buildFundamentalRiskSummary(holdings, fundamentalsByTicker) {
+    fundamentalsByTicker = fundamentalsByTicker || {};
+    const risks = [];
+    holdings.forEach(h => {
+      if (h.active === false) return;
+      const ticker = String(h.ticker || "").trim().toUpperCase();
+      const health = evaluateFundamentalHealth(h, fundamentalsByTicker[ticker] || fundamentalsByTicker[h.ticker]);
+      if (health.severity !== "healthy") risks.push({ holding: h, ticker, health });
+    });
+    return risks;
+  }
+
   function computeRow(holding) {
     const security = WealthData.getSecurity(holding.ticker);
-    const fundamentals = WealthData.getFundamentals(holding.ticker);
+    const normalizedTicker = String(holding.ticker || "").trim().toUpperCase();
+    const fundamentals = WealthData.getFundamentals(normalizedTicker) || WealthData.getFundamentals(holding.ticker);
     const currentPrice = holding.currentPrice || holding.avgCost;
     const currentValue = holding.quantity * currentPrice;
     const investedValue = holding.quantity * holding.avgCost;
@@ -22,7 +56,8 @@ const PortfolioModule = (function () {
     const gainPct = investedValue ? (gainAbs / investedValue) * 100 : 0;
     const sector = security ? security.sector : null;
     const hasFundamentals = !!fundamentals;
-    return { holding, currentPrice, currentValue, investedValue, gainAbs, gainPct, sector, hasFundamentals };
+    const health = evaluateFundamentalHealth(holding, fundamentals);
+    return { holding, currentPrice, currentValue, investedValue, gainAbs, gainPct, sector, hasFundamentals, health };
   }
 
   function computeSummary(rows) {
@@ -180,6 +215,7 @@ const PortfolioModule = (function () {
         <p class="module-sub">Current holdings plus a manual BUY/SELL ledger. Transactions update weighted-average cost; sales preserve realised gain history.</p>
       </div>
 
+      <div id="pf-risk-dashboard" style="margin-bottom:20px;"></div>
       <div id="pf-summary"></div>
 
       <div class="panel" id="pf-transaction-panel" style="margin:20px 0;">
@@ -206,7 +242,7 @@ const PortfolioModule = (function () {
       <div class="section-head"><span class="section-title" style="font-size:15px;">Holdings</span><span class="module-sub" id="pf-count" style="margin-left:auto;"></span></div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Ticker</th><th>Qty</th><th>Avg Cost</th><th>Current</th><th>Value</th><th>Unrealised</th><th>Sector</th><th>Actions</th></tr></thead>
+          <thead><tr><th>Ticker</th><th>Qty</th><th>Avg Cost</th><th>Current</th><th>Value</th><th>Unrealised</th><th>Sector</th><th>Fundamental Health</th><th>Actions</th></tr></thead>
           <tbody id="pf-table-body"></tbody>
         </table>
       </div>
@@ -273,6 +309,37 @@ const PortfolioModule = (function () {
     `;
 
     container.querySelector("#pf-count").textContent = `${rows.length} ${rows.length === 1 ? "holding" : "holdings"}`;
+
+    const risks = buildFundamentalRiskSummary(holdings, WealthData.get().fundamentals || {});
+    const riskHtml = risks.length === 0
+      ? `<div style="padding:14px;background:var(--bg-ticket);border:1px solid var(--rule-bright);color:var(--gain);display:flex;align-items:center;gap:8px;">✅ <strong>Zero Fundamental Risks Detected.</strong> All active holdings are eligible and flag-free.</div>`
+      : `<div style="padding:14px;background:var(--bg-ticket);border:1px solid var(--rule-bright);">
+          <div style="font-weight:600;margin-bottom:8px;color:var(--loss);">⚠️ Fundamental Risks Detected in Active Holdings</div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            ${risks.map(r => {
+              const text = r.health.severity === 'red' ? `Detected ${r.health.flags.length} red flag(s)` : `Status: ${r.health.status}`;
+              const reasons = r.health.flags.length ? r.health.flags : r.health.missing.map(item => `Missing: ${item}`);
+              return `<div style="display:flex;align-items:center;gap:12px;font-size:12px;background:var(--bg-raised);padding:8px;border:1px solid var(--rule-bright);">
+                <strong style="width:70px;">${escapeHtml(r.ticker)}</strong>
+                <div style="color:${r.health.severity === 'red' ? 'var(--loss)' : 'var(--amber)'};flex:1;">
+                  <div>${escapeHtml(text)}</div>
+                  <ul style="margin:4px 0 0 16px;padding:0;">${reasons.map(reason => `<li>${escapeHtml(reason)}</li>`).join("")}</ul>
+                </div>
+                <button class="btn btn-review-risk" data-ticker="${escapeHtml(r.ticker)}" style="padding:4px 8px;font-size:11px;">Review</button>
+              </div>`;
+            }).join("")}
+          </div>
+         </div>`;
+    container.querySelector("#pf-risk-dashboard").innerHTML = riskHtml;
+
+    container.querySelectorAll(".btn-review-risk").forEach(btn => {
+      btn.addEventListener("click", () => {
+        if (typeof FundamentalsModule !== "undefined" && typeof FundamentalsModule.openTicker === "function") {
+          FundamentalsModule.openTicker(btn.dataset.ticker);
+        }
+      });
+    });
+
     container.querySelector("#pf-table-body").innerHTML = rows.length ? rows.map(row => `
       <tr>
         <td>${row.holding.ticker}</td><td>${row.holding.quantity}</td>
@@ -280,9 +347,10 @@ const PortfolioModule = (function () {
         <td>${fmtINR(row.currentValue)}</td>
         <td style="color:${row.gainPct >= 0 ? 'var(--gain)' : 'var(--loss)'}">${row.gainPct >= 0 ? '+' : ''}${row.gainPct.toFixed(1)}%</td>
         <td>${row.sector || '—'}</td>
+        <td style="color:${row.health.severity === 'red' ? 'var(--loss)' : (row.health.severity === 'amber' ? 'var(--amber)' : 'var(--gain)')}">${row.health.severity === 'red' ? '⚠️ ' : (row.health.severity === 'amber' ? '⚠️ ' : '✅ ')}${escapeHtml(row.health.status)}</td>
         <td><div class="holding-actions"><button class="btn holding-sell" data-sell="${row.holding.id}">Sell</button><button class="ticker-chip holding-delete" data-delete-holding="${row.holding.id}">Delete holding</button></div></td>
       </tr>
-    `).join("") : `<tr><td colspan="8" style="text-align:center;color:var(--paper-faint);font-style:italic;">No holdings yet.</td></tr>`;
+    `).join("") : `<tr><td colspan="9" style="text-align:center;color:var(--paper-faint);font-style:italic;">No holdings yet.</td></tr>`;
 
     container.querySelector("#pf-card-list").innerHTML = rows.length ? rows.map(row => `
       <div class="data-card">
@@ -290,6 +358,7 @@ const PortfolioModule = (function () {
         <div class="data-card-row"><span class="k">Qty</span><span class="v">${row.holding.quantity}</span></div>
         <div class="data-card-row"><span class="k">Average cost</span><span class="v">₹${row.holding.avgCost.toLocaleString("en-IN")}</span></div>
         <div class="data-card-row"><span class="k">Current value</span><span class="v">${fmtINR(row.currentValue)}</span></div>
+        <div class="data-card-row"><span class="k">Fundamental Health</span><span class="v" style="color:${row.health.severity === 'red' ? 'var(--loss)' : (row.health.severity === 'amber' ? 'var(--amber)' : 'var(--gain)')}">${row.health.severity === 'red' ? '⚠️ ' : (row.health.severity === 'amber' ? '⚠️ ' : '✅ ')}${escapeHtml(row.health.status)}</span></div>
         <button class="btn holding-sell" data-sell="${row.holding.id}" style="margin-top:10px;">Sell</button>
         <button class="btn holding-delete" data-delete-holding="${row.holding.id}" style="margin-top:8px;background:transparent;border:1px solid var(--rule-bright);color:var(--paper-dim);">Delete holding</button>
       </div>
@@ -333,6 +402,6 @@ const PortfolioModule = (function () {
   return {
     render, computeRow, computeSummary, computeRealisedGain,
     isValidTransactionDate, validateTransaction, createTransactionPlan,
-    formatTransactionDate, localISODate
+    formatTransactionDate, localISODate, escapeHtml, evaluateFundamentalHealth, buildFundamentalRiskSummary
   };
 })();

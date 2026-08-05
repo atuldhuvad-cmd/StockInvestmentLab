@@ -26,6 +26,9 @@ function assertExact(label, actual, expected) {
 }
 
 eval(fs.readFileSync(path.join(__dirname,'..','..','01_Source','wealth-suite','js/data-model.js'),'utf8') + '\nglobal.WealthData = WealthData;');
+eval(fs.readFileSync(path.join(__dirname,'..','..','01_Source','wealth-suite','js/company-calculations.js'),'utf8') + '\nglobal.CompanyCalculations = CompanyCalculations;');
+eval(fs.readFileSync(path.join(__dirname,'..','..','01_Source','wealth-suite','js/company-calculations.js'),'utf8') + '\nglobal.CompanyCalculations = CompanyCalculations;');
+eval(fs.readFileSync(path.join(__dirname,'..','..','01_Source','wealth-suite','js/company-calculations.js'),'utf8') + '\nglobal.CompanyCalculations = CompanyCalculations;');
 global.document = {};
 global.App = { showStatus: ()=>{}, saveNow: ()=>{} };
 eval(fs.readFileSync(path.join(__dirname,'..','..','01_Source','wealth-suite','js/modules/portfolio.js'),'utf8') + '\nglobal.PortfolioModule = PortfolioModule;');
