@@ -162,6 +162,16 @@ assertExact("TC-F12i", "Enrollment history survives JSON backup restoration", We
 WealthData.deleteFundamentals("DIXON");
 assertExact("TC-F12j", "Explicit delete removes enrollment", WealthData.getFundamentals("DIXON"), undefined);
 
+console.log("\n=== TC-F13: Portfolio risk navigation target ===");
+const navigationStateBefore = JSON.stringify(WealthData.get());
+let navigationTarget = null;
+global.App = { switchTo: key => { navigationTarget = key; } };
+assertExact("TC-F13a", "Lowercase Nifty ticker is accepted", FundamentalsModule.openTicker(" dixon "), true);
+assertExact("TC-F13b", "Valid risk action navigates to Fundamentals", navigationTarget, "fundamentals");
+navigationTarget = null;
+assertExact("TC-F13c", "Non-Nifty ticker is rejected", FundamentalsModule.openTicker("NOT_A_NIFTY_STOCK"), false);
+assertExact("TC-F13d", "Navigation action does not mutate WealthData", JSON.stringify(WealthData.get()), navigationStateBefore);
+
 console.log(`\n=== INTERIM SUMMARY (before Net Margin closure below): ${passCount} passed, ${failCount} failed ===`);
 
 // ---- Added: closing the Net Margin gap flagged as NOT VERIFIED ----

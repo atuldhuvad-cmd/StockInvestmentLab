@@ -1,10 +1,12 @@
 const fs = require('fs');
 const path = require('path');
+const assert = require('assert');
 // PROJ-D01b fix (2026-07-23): resolve source relative to this file, not cwd,
 // so the suite runs from any working directory (was cwd-relative 'js/...').
 const suiteRoot = path.resolve(__dirname, '..', '..', '01_Source', 'wealth-suite');
 eval(fs.readFileSync(path.join(suiteRoot, 'js/data-model.js'), 'utf8') + '\nglobal.WealthData = WealthData;');
 global.document = {};
+eval(fs.readFileSync(path.join(suiteRoot, 'js/company-calculations.js'), 'utf8') + '\nglobal.CompanyCalculations = CompanyCalculations;');
 eval(fs.readFileSync(path.join(suiteRoot, 'js/modules/portfolio.js'), 'utf8') + '\nglobal.PortfolioModule = PortfolioModule;');
 
 function testCase(id, holding, security, expected) {
@@ -16,6 +18,7 @@ function testCase(id, holding, security, expected) {
   console.log(`  Actual:   currentValue=${row.currentValue}, investedValue=${row.investedValue}, gainAbs=${row.gainAbs}, gainPct=${row.gainPct}`);
   const matches = Object.keys(expected).every(k => Math.abs(row[k] - expected[k]) < 0.0001);
   console.log(`  ${matches ? "PASS" : "FAIL"}`);
+  assert.ok(matches, `${id} calculation mismatch`);
   return { id, row, matches };
 }
 
@@ -82,3 +85,110 @@ console.log(`  totalGain: ${summary.totalGain} (expect 0)`);
 console.log(`  bySector: ${JSON.stringify(summary.bySector)} (expect {IT:1100, Banking:900})`);
 console.log(`  byAssetClass: ${JSON.stringify(summary.byAssetClass)} (expect {Equity:1100, Gold:900})`);
 console.log(`  ${summary.totalValue===2000 && summary.totalInvested===2000 && summary.totalGain===0 && summary.bySector.IT===1100 && summary.bySector.Banking===900 && summary.byAssetClass.Equity===1100 && summary.byAssetClass.Gold===900 ? "PASS" : "FAIL"}`);
+assert.strictEqual(summary.totalValue, 2000);
+assert.strictEqual(summary.totalInvested, 2000);
+assert.strictEqual(summary.totalGain, 0);
+assert.deepStrictEqual(summary.bySector, { IT: 1100, Banking: 900 });
+assert.deepStrictEqual(summary.byAssetClass, { Equity: 1100, Gold: 900 });
+
+console.log("\n=== evaluateFundamentalHealth & buildFundamentalRiskSummary tests ===");
+
+const MOCK_HOLDINGS = [
+  { ticker: "MISSING_STK", active: true, quantity: 10 },
+  { ticker: "PARTIAL_STK", active: true, quantity: 10 },
+  { ticker: "STALE_STK", active: true, quantity: 10 },
+  { ticker: "ELIGIBLE_NO_FLAGS", active: true, quantity: 10 },
+  { ticker: "ELIGIBLE_RED_FLAGS", active: true, quantity: 10 },
+  { ticker: "INACTIVE_STK", active: false, quantity: 10 }
+];
+
+const now = new Date();
+const oldDate = new Date();
+oldDate.setDate(now.getDate() - 600); // Stale > 550 days
+
+const MOCK_FUNDAMENTALS = {
+  "PARTIAL_STK": { ticker: "PARTIAL_STK", manualRatios: { roe: 10 } },
+  "STALE_STK": {
+    ticker: "STALE_STK",
+    manualRatios: { roe: 15, debtEquity: 0.5, pe: 20, revenueCagr: 10 },
+    qualitative: { economicMoat: 4, pricingPower: 4 },
+    evidence: { sourceName: "Annual Report", evidenceDate: oldDate.toISOString().split("T")[0], status: "Verified" }
+  },
+  "ELIGIBLE_NO_FLAGS": {
+    ticker: "ELIGIBLE_NO_FLAGS",
+    manualRatios: { roe: 15, debtEquity: 0.5, pe: 20, revenueCagr: 10 },
+    qualitative: { economicMoat: 4, pricingPower: 4 },
+    evidence: { sourceName: "Annual Report", evidenceDate: now.toISOString().split("T")[0], status: "Verified" },
+    years: [
+      { year: 2023, netProfit: 100, operatingCashFlow: 120, totalDebt: 50 },
+      { year: 2024, netProfit: 110, operatingCashFlow: 130, totalDebt: 45 }
+    ]
+  },
+  "ELIGIBLE_RED_FLAGS": {
+    ticker: "ELIGIBLE_RED_FLAGS",
+    manualRatios: { roe: 15, debtEquity: 0.5, pe: 20, revenueCagr: 10 },
+    qualitative: { economicMoat: 4, pricingPower: 4 },
+    evidence: { sourceName: "Annual Report", evidenceDate: now.toISOString().split("T")[0], status: "Verified" },
+    years: [
+      { year: 2023, netProfit: 100, operatingCashFlow: 80, totalDebt: 50 }, // Missing FCF flag condition etc
+      { year: 2024, netProfit: 110, operatingCashFlow: 70, totalDebt: 100 } // Rising debt, poor FCF
+    ]
+  }
+};
+
+const risks = PortfolioModule.buildFundamentalRiskSummary(MOCK_HOLDINGS, MOCK_FUNDAMENTALS);
+
+function assertRisk(ticker, expectedSeverity, expectedStatus, expectsFlags) {
+  const risk = risks.find(r => r.holding.ticker === ticker);
+  if (expectedSeverity === "healthy") {
+    console.log(`  ${ticker} (healthy): ${risk === undefined ? "PASS" : "FAIL (found risk)"}`);
+    assert.strictEqual(risk, undefined, `${ticker} should not appear in risk summary`);
+    return;
+  }
+  assert.ok(risk, `${ticker} risk not found`);
+  const matchSeverity = risk.health.severity === expectedSeverity;
+  const matchStatus = risk.health.status === expectedStatus;
+  const matchFlags = (risk.health.flags.length > 0) === expectsFlags;
+  console.log(`  ${ticker}: ${matchSeverity && matchStatus && matchFlags ? "PASS" : "FAIL"} (sev=${risk.health.severity} status='${risk.health.status}' flags=${risk.health.flags.length})`);
+  assert.strictEqual(risk.health.severity, expectedSeverity);
+  assert.strictEqual(risk.health.status, expectedStatus);
+  assert.strictEqual(risk.health.flags.length > 0, expectsFlags);
+}
+
+assertRisk("MISSING_STK", "amber", "Missing", false);
+assertRisk("PARTIAL_STK", "amber", "Partial", false);
+assertRisk("STALE_STK", "amber", "Stale", false);
+assertRisk("ELIGIBLE_NO_FLAGS", "healthy", "Eligible for Full Rating", false);
+assertRisk("ELIGIBLE_RED_FLAGS", "red", "Eligible for Full Rating", true);
+
+const inactiveRisk = risks.find(r => r.holding.ticker === "INACTIVE_STK");
+console.log(`  INACTIVE_STK excluded: ${inactiveRisk === undefined ? "PASS" : "FAIL"}`);
+assert.strictEqual(inactiveRisk, undefined);
+
+const missingHealth = PortfolioModule.evaluateFundamentalHealth({ ticker: "MISSING_STK" }, undefined);
+assert.ok(missingHealth.missing.includes("ROE"), "Missing record should expose coverage requirements");
+
+const malformedYearsHealth = PortfolioModule.evaluateFundamentalHealth(
+  { ticker: "MALFORMED" },
+  { manualRatios: { roe: 1 }, years: "not-an-array" }
+);
+assert.strictEqual(malformedYearsHealth.flags.length, 0, "Malformed years must not crash or fabricate flags");
+
+const lowercaseRisks = PortfolioModule.buildFundamentalRiskSummary(
+  [{ ticker: "stale_stk", active: true }],
+  MOCK_FUNDAMENTALS
+);
+assert.strictEqual(lowercaseRisks[0].health.status, "Stale", "Ticker lookup should be case-insensitive");
+
+assert.strictEqual(
+  PortfolioModule.escapeHtml(`<img src=x onerror='alert(1)'>`),
+  "&lt;img src=x onerror=&#39;alert(1)&#39;&gt;"
+);
+
+console.log("\n=== Zero Risk Aggregation Test ===");
+const zeroRisks = PortfolioModule.buildFundamentalRiskSummary(
+  [{ ticker: "ELIGIBLE_NO_FLAGS", active: true, quantity: 10 }],
+  MOCK_FUNDAMENTALS
+);
+console.log(`  Zero Risk Aggregation: ${zeroRisks.length === 0 ? "PASS" : "FAIL (expected 0 risks)"}`);
+assert.strictEqual(zeroRisks.length, 0);

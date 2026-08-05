@@ -22,6 +22,7 @@ function load(relativePath, globalName) {
 }
 
 load("js/data-model.js", "WealthData");
+load("js/company-calculations.js", "CompanyCalculations");
 global.document = {};
 global.App = { showStatus: () => {}, saveNow: () => Promise.resolve(true) };
 load("js/modules/portfolio.js", "PortfolioModule");
