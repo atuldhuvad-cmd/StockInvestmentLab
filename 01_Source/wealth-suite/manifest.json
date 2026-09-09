@@ -1,0 +1,21 @@
+{
+  "name": "Wealth Intelligence Suite",
+  "short_name": "Wealth Suite",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#14120D",
+  "theme_color": "#D99A3D",
+  "description": "Personal Delivery Investment and Portfolio Management Platform",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
