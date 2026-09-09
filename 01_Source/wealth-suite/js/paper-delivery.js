@@ -94,6 +94,16 @@ const PaperDelivery = (function () {
     sortTransactions(transactions).forEach(transaction => {
       const ticker = String(transaction.ticker || "").trim().toUpperCase();
       const type = String(transaction.transactionType || "").toUpperCase();
+
+      if (type === "PLANNED") {
+        if (!ticker) {
+          errors.push({ id: transaction.id, message: "Invalid planned transaction" });
+          return;
+        }
+        enrichedTransactions.push({ ...transaction, ticker: ticker, transactionType: type });
+        return;
+      }
+
       const quantity = finiteNumber(transaction.quantity);
       const price = finiteNumber(transaction.price);
       const chargeValue = finiteNumber(transaction.charges);
@@ -117,7 +127,13 @@ const PaperDelivery = (function () {
             averageCost: 0,
             entryDate: transaction.transactionDate || null,
             entrySnapshot: transaction.entrySnapshot
-              ? JSON.parse(JSON.stringify(transaction.entrySnapshot)) : null
+              ? JSON.parse(JSON.stringify(transaction.entrySnapshot)) : null,
+            entryNote: transaction.entryNote || null,
+            tradeId: transaction.id,
+            plannedEntryPrice: transaction.plannedEntryPrice || null,
+            plannedStopPrice: transaction.plannedStopPrice || null,
+            plannedTargetPrice: transaction.plannedTargetPrice || null,
+            plannedRiskAmount: transaction.plannedRiskAmount || null
           };
           cycle = {
             ticker: ticker,
@@ -194,7 +210,14 @@ const PaperDelivery = (function () {
           realisedReturnPct: cycle.soldCost > 0
             ? cycle.realisedGain / cycle.soldCost * 100 : null,
           entrySnapshot: cycle.entrySnapshot
-            ? JSON.parse(JSON.stringify(cycle.entrySnapshot)) : null
+            ? JSON.parse(JSON.stringify(cycle.entrySnapshot)) : null,
+          entryNote: cycle.entryNote || holding.entryNote || null,
+          exitNote: transaction.exitNote || transaction.notes || null,
+          tradeNotes: transaction.tradeNotes || null,
+          plannedEntryPrice: holding.plannedEntryPrice || null,
+          plannedStopPrice: holding.plannedStopPrice || null,
+          plannedTargetPrice: holding.plannedTargetPrice || null,
+          plannedRiskAmount: holding.plannedRiskAmount || null
         });
         holdings.delete(ticker);
         cycles.delete(ticker);
@@ -296,6 +319,36 @@ const PaperDelivery = (function () {
     };
   }
 
+
+  function calculatePositionSize(maxRiskAmount, entryPrice, stopPrice, maxCapital) {
+    const risk = finiteNumber(maxRiskAmount);
+    const entry = finiteNumber(entryPrice);
+    const stop = finiteNumber(stopPrice);
+    const capitalLimit = finiteNumber(maxCapital);
+
+    if (risk === null || risk <= 0 || entry === null || entry <= 0 || stop === null || stop <= 0) {
+      return { status: "NOT_CALCULATED", reason: "Invalid prices or risk amount" };
+    }
+    if (entry <= stop) {
+      return { status: "NOT_CALCULATED", reason: "Stop price must be below entry price for LONG trades" };
+    }
+    const perShareRisk = entry - stop;
+    let quantity = Math.floor(risk / perShareRisk);
+    if (capitalLimit !== null && capitalLimit > 0) {
+      const maxQtyByCap = Math.floor(capitalLimit / entry);
+      quantity = Math.min(quantity, maxQtyByCap);
+    }
+    if (quantity <= 0) {
+      return { status: "NOT_CALCULATED", reason: "Risk budget too small for a single share" };
+    }
+    return {
+      status: "CALCULATED",
+      quantity: quantity,
+      perShareRisk: perShareRisk,
+      totalCapital: quantity * entry
+    };
+  }
+
   function createTransactionPlan(transactions, configInput, input, options = {}) {
     const config = normalizeConfig(configInput);
     const type = String(input && input.transactionType || "").toUpperCase();
@@ -307,8 +360,31 @@ const PaperDelivery = (function () {
     const charges = chargeInput === null ? -1 : chargeInput;
     const today = options.today || localISODate();
 
-    if (!["BUY", "SELL"].includes(type)) return { ok: false, error: "Transaction type must be BUY or SELL" };
+    if (!["BUY", "SELL", "PLANNED"].includes(type)) return { ok: false, error: "Transaction type must be BUY, SELL or PLANNED" };
     if (!ticker) return { ok: false, error: "Ticker is required" };
+
+    if (type === "PLANNED") {
+      const transaction = {
+        id: options.id !== undefined ? options.id : Date.now() + Math.random(),
+        ticker: ticker,
+        transactionType: type,
+        plannedEntryPrice: finiteNumber(input.plannedEntryPrice),
+        plannedStopPrice: finiteNumber(input.plannedStopPrice),
+        plannedTargetPrice: finiteNumber(input.plannedTargetPrice),
+        plannedRiskAmount: finiteNumber(input.plannedRiskAmount),
+        quantity: finiteNumber(input.quantity),
+        notes: String(input.notes || "").trim(),
+        createdAt: options.createdAt || new Date().toISOString()
+      };
+      
+      const proposed = replay(
+        (Array.isArray(transactions) ? transactions : []).concat([transaction]),
+        today
+      );
+      if (proposed.errors.length) return { ok: false, error: proposed.errors[0].message };
+      return { ok: true, transaction: transaction, ledger: proposed };
+    }
+
     if (!isValidDate(input.transactionDate, today)) {
       return { ok: false, error: type + " date is required, valid, and cannot be in the future" };
     }
@@ -363,6 +439,13 @@ const PaperDelivery = (function () {
         ? String(input.manualPriceNote || "").trim() : null,
       charges: charges,
       notes: String(input.notes || "").trim(),
+      entryNote: input.entryNote ? String(input.entryNote).trim() : null,
+      exitNote: input.exitNote ? String(input.exitNote).trim() : null,
+      tradeNotes: input.tradeNotes ? String(input.tradeNotes).trim() : null,
+      plannedEntryPrice: finiteNumber(input.plannedEntryPrice),
+      plannedStopPrice: finiteNumber(input.plannedStopPrice),
+      plannedTargetPrice: finiteNumber(input.plannedTargetPrice),
+      plannedRiskAmount: finiteNumber(input.plannedRiskAmount),
       createdAt: options.createdAt || new Date().toISOString()
     };
     if (type === "BUY") {
@@ -628,6 +711,7 @@ const PaperDelivery = (function () {
     getCurrentPrice: getCurrentPrice,
     validateManualPrice: validateManualPrice,
     snapshotCandidate: snapshotCandidate,
+    calculatePositionSize: calculatePositionSize,
     createTransactionPlan: createTransactionPlan,
     currentPortfolio: currentPortfolio,
     maximumDrawdown: maximumDrawdown,

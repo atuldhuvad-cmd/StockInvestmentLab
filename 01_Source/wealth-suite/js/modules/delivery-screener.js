@@ -20,6 +20,7 @@ const DeliveryScreenerModule = (function () {
   const PAPER_SECTIONS = [
     ["summary", "Summary"],
     ["portfolio", "Paper Portfolio"],
+    ["journal", "Trade Journal"],
     ["transactions", "Transactions"],
     ["performance", "Performance Review"]
   ];
@@ -27,6 +28,8 @@ const DeliveryScreenerModule = (function () {
   let paperContainer = null;
   let showCapitalConfig = false;
   let pendingBuyTicker = null;
+  let pendingPlanTicker = null;
+  let convertingPlanTradeId = null;
   let pendingSellTicker = null;
   let submitting = false;
   const recentPaperQuotes = {};
@@ -476,6 +479,9 @@ const DeliveryScreenerModule = (function () {
       listEl.querySelectorAll("[data-paper-buy]").forEach(btn => {
         btn.addEventListener("click", () => openPaperBuy(btn.dataset.paperBuy));
       });
+      listEl.querySelectorAll("[data-paper-plan]").forEach(btn => {
+        btn.addEventListener("click", () => openPaperPlan(btn.dataset.paperPlan));
+      });
 
       if (visibleCount < filtered.length) {
         showMoreBtn.style.display = "block";
@@ -743,6 +749,7 @@ const DeliveryScreenerModule = (function () {
 
           <div class="paper-action-row">
             <button class="btn" data-paper-buy="${c.ticker}">Paper Buy</button>
+            <button class="btn" data-paper-plan="${c.ticker}" style="background:var(--amber);color:var(--bg);">Plan Trade</button>
             <button class="btn" data-expand="${cardId}" style="background:transparent;border:1px solid var(--rule-bright);color:var(--paper-dim);">Show breakdown ▾</button>
           </div>
 
@@ -1001,6 +1008,7 @@ const DeliveryScreenerModule = (function () {
       '<div class="field-row paper-field"><label for="paper-sell-charges">Charges</label><input id="paper-sell-charges" type="number" min="0" step="0.01" value="0"></div>',
       '<div class="field-row paper-field paper-field-wide"><label for="paper-sell-reason">Exit reason</label><textarea id="paper-sell-reason" rows="2"></textarea></div>',
       '<div class="field-row paper-field paper-field-wide"><label for="paper-sell-notes">Notes</label><textarea id="paper-sell-notes" rows="2"></textarea></div>',
+      '<div class="field-row paper-field paper-field-wide"><label for="paper-sell-trade-notes">Lessons / Post-Trade Review</label><textarea id="paper-sell-trade-notes" rows="2"></textarea></div>',
       '</div>',
       renderPriceSelector("sell", holding.ticker, currentPrice),
       '<div class="paper-action-row"><button class="btn" id="paper-confirm-sell">Record Paper Sell</button><button class="ticker-chip" id="paper-cancel-sell">Cancel</button></div>',
@@ -1152,6 +1160,7 @@ const DeliveryScreenerModule = (function () {
     });
     const content = container.querySelector("#paper-section-content");
     if (activePaperSection === "portfolio") renderPaperPortfolio(content);
+    else if (activePaperSection === "journal") renderTradeJournal(content);
     else if (activePaperSection === "transactions") renderPaperTransactions(content);
     else if (activePaperSection === "performance") renderPerformanceReview(content);
     else renderPaperSummaryScreen(content);
@@ -1186,6 +1195,7 @@ const DeliveryScreenerModule = (function () {
     const cancelBuy = container.querySelector("#paper-cancel-buy");
     if (cancelBuy) cancelBuy.addEventListener("click", () => {
       pendingBuyTicker = null;
+      convertingPlanTradeId = null;
       refreshPaper();
     });
     const confirmBuy = container.querySelector("#paper-confirm-buy");
@@ -1226,6 +1236,20 @@ const DeliveryScreenerModule = (function () {
         confirmBuy.disabled = false;
         App.showStatus(plan.error, "error");
         return;
+      }
+      if (convertingPlanTradeId) {
+        const plannedTx = WealthData.getPaperDeliveryTransactions().find(tx => String(tx.id) === String(convertingPlanTradeId));
+        if (plannedTx) {
+          plan.transaction.plannedEntryPrice = plannedTx.plannedEntryPrice;
+          plan.transaction.plannedStopPrice = plannedTx.plannedStopPrice;
+          plan.transaction.plannedTargetPrice = plannedTx.plannedTargetPrice;
+          plan.transaction.plannedRiskAmount = plannedTx.plannedRiskAmount;
+          if (plannedTx.notes && !plan.transaction.entryNote) {
+            plan.transaction.entryNote = plannedTx.notes;
+          }
+        }
+        WealthData.removePaperDeliveryTransaction(convertingPlanTradeId);
+        convertingPlanTradeId = null;
       }
       WealthData.addPaperDeliveryTransaction(plan.transaction);
       await App.saveNow(false);
@@ -1374,6 +1398,183 @@ const DeliveryScreenerModule = (function () {
     }).join("");
   }
 
+
+  function openPaperPlan(ticker) {
+    pendingPlanTicker = ticker;
+    activePaperSection = "journal";
+    App.switchTo("paper-trading");
+  }
+
+  function renderTradeJournal(container) {
+    const state = WealthData.get();
+    const transactions = Array.isArray(state.paperDeliveryTransactions) ? state.paperDeliveryTransactions : [];
+    const plannedTrades = transactions.filter(t => t.transactionType === "PLANNED").sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    
+    const summary = PaperDelivery.summary(state);
+    const openPositions = summary.portfolio.holdings;
+    const closedPositions = summary.portfolio.closedPositions.slice().sort((a, b) => b.exitDate.localeCompare(a.exitDate));
+
+    let html = '<div class="module-header"><h2>Trade Journal</h2><p class="module-sub">Lifecycle tracking for planned, open, and closed trades with qualitative notes.</p></div>';
+
+    if (pendingPlanTicker) {
+      const candidate = computeCandidate(pendingPlanTicker);
+      const currPrice = PaperDelivery.getCurrentPrice(candidate.ticker, state);
+      
+      html += '<div class="specimen"><h2>Plan Trade: ' + paperEscape(candidate.ticker) + '</h2>' +
+        '<div class="paper-form-grid">' +
+        '<div class="field-row paper-field"><label>Planned Entry Price</label><input type="number" id="plan-entry" placeholder="e.g. 150"></div>' +
+        '<div class="field-row paper-field"><label>Planned Stop Loss</label><input type="number" id="plan-stop" placeholder="e.g. 140"></div>' +
+        '<div class="field-row paper-field"><label>Planned Target</label><input type="number" id="plan-target" placeholder="e.g. 180"></div>' +
+        '<div class="field-row paper-field"><label>Max Risk Capital (Hint)</label><input type="number" id="plan-risk" placeholder="e.g. 500"></div>' +
+        '<div class="field-row paper-field paper-field-wide"><label>Trade Notes (Reasoning)</label><textarea id="plan-notes" rows="2"></textarea></div>' +
+        '</div>' +
+        '<div class="paper-action-row">' +
+        '<button class="btn" id="plan-calc-btn" style="background:var(--rule);color:var(--paper);border:1px solid var(--rule-bright);">Calculate Size</button>' +
+        '<button class="btn" id="plan-save-btn">Save Planned Trade</button>' +
+        '<button class="btn" id="plan-cancel-btn" style="background:transparent;border:1px solid var(--loss);color:var(--loss);">Cancel</button>' +
+        '</div>' +
+        '<div id="plan-calc-result" style="margin-top:12px;font-family:var(--mono);font-size:12px;color:var(--amber);"></div>' +
+        '</div>';
+    }
+
+    html += '<h3 class="section-title paper-section-head">Planned Trades (' + plannedTrades.length + ')</h3>';
+    if (!plannedTrades.length && !pendingPlanTicker) html += '<p class="overview-empty">No planned trades.</p>';
+    plannedTrades.forEach(t => {
+      html += '<div class="specimen" style="border-left: 3px solid var(--amber);"><h2>' + paperEscape(t.ticker) + ' (PLANNED)</h2>' +
+        '<div class="overview-list">' +
+        '<div class="overview-list-row"><span>Planned Entry</span><strong>' + paperMoney(t.plannedEntryPrice) + '</strong></div>' +
+        '<div class="overview-list-row"><span>Planned Stop</span><strong>' + paperMoney(t.plannedStopPrice) + '</strong></div>' +
+        '<div class="overview-list-row"><span>Planned Target</span><strong>' + paperMoney(t.plannedTargetPrice) + '</strong></div>' +
+        '<div class="overview-list-row"><span>Max Risk</span><strong>' + paperMoney(t.plannedRiskAmount) + '</strong></div>' +
+        '<div class="overview-list-row"><span>Calculated Qty</span><strong>' + paperEscape(t.quantity) + '</strong></div>' +
+        '</div>';
+      if (t.notes) html += '<p style="margin-top:10px;"><strong>Notes:</strong> ' + paperEscape(t.notes) + '</p>';
+      
+      html += '<div class="paper-action-row" style="margin-top:14px;">' +
+        '<button class="btn" data-convert-plan="' + t.id + '" style="background:var(--gain);">Execute (BUY)</button>' +
+        '<button class="btn holding-delete" data-delete-plan="' + t.id + '" style="background:transparent;border:1px solid var(--loss);color:var(--loss);">Cancel Plan</button>' +
+        '</div></div>';
+    });
+
+    html += '<h3 class="section-title paper-section-head">Open Positions (' + openPositions.length + ')</h3>';
+    if (!openPositions.length) html += '<p class="overview-empty">No open positions.</p>';
+    openPositions.forEach(p => {
+      html += '<div class="specimen" style="border-left: 3px solid var(--gain);"><h2>' + paperEscape(p.ticker) + ' (OPEN)</h2>' +
+        '<div class="overview-list">' +
+        '<div class="overview-list-row"><span>Entry Price</span><strong>' + paperMoney(p.averageCost) + '</strong></div>' +
+        '<div class="overview-list-row"><span>Quantity</span><strong>' + p.quantity + '</strong></div>' +
+        '<div class="overview-list-row"><span>Entry Date</span><strong>' + paperEscape(p.entryDate) + '</strong></div>' +
+        '</div>';
+      if (p.entryNote) html += '<p style="margin-top:10px;"><strong>Entry Note:</strong> ' + paperEscape(p.entryNote) + '</p>';
+      html += '</div>';
+    });
+
+    html += '<h3 class="section-title paper-section-head">Closed Trades (' + closedPositions.length + ')</h3>';
+    if (!closedPositions.length) html += '<p class="overview-empty">No closed trades.</p>';
+    closedPositions.forEach(p => {
+      html += '<div class="specimen" style="border-left: 3px solid var(--rule-bright);"><h2>' + paperEscape(p.ticker) + ' (CLOSED)</h2>' +
+        '<div class="overview-list">' +
+        '<div class="overview-list-row"><span>Realised Return</span><strong>' + paperPercent(p.realisedReturnPct) + '</strong></div>' +
+        '<div class="overview-list-row"><span>Entry Date</span><strong>' + paperEscape(p.entryDate) + '</strong></div>' +
+        '<div class="overview-list-row"><span>Exit Date</span><strong>' + paperEscape(p.exitDate) + '</strong></div>' +
+        '</div>';
+      if (p.entryNote) html += '<p style="margin-top:10px;"><strong>Entry Note:</strong> ' + paperEscape(p.entryNote) + '</p>';
+      if (p.exitNote) html += '<p style="margin-top:10px;"><strong>Exit Note:</strong> ' + paperEscape(p.exitNote) + '</p>';
+      if (p.tradeNotes) html += '<p style="margin-top:10px;"><strong>Lessons / Review:</strong> ' + paperEscape(p.tradeNotes) + '</p>';
+      html += '</div>';
+    });
+
+    container.innerHTML = html;
+
+    if (pendingPlanTicker) {
+      const calcBtn = container.querySelector("#plan-calc-btn");
+      const saveBtn = container.querySelector("#plan-save-btn");
+      const cancelBtn = container.querySelector("#plan-cancel-btn");
+      const resEl = container.querySelector("#plan-calc-result");
+
+      if (calcBtn) calcBtn.addEventListener("click", () => {
+        const risk = Number(container.querySelector("#plan-risk").value);
+        const entry = Number(container.querySelector("#plan-entry").value);
+        const stop = Number(container.querySelector("#plan-stop").value);
+        const res = PaperDelivery.calculatePositionSize(risk, entry, stop, null);
+        if (res.status === "CALCULATED") {
+          resEl.innerHTML = "Calculated Qty: " + res.quantity + " | Risk/Share: " + res.perShareRisk.toFixed(2) + " | Total Cap: " + res.totalCapital.toFixed(2);
+        } else {
+          resEl.innerHTML = "Error: " + res.reason;
+        }
+      });
+
+      if (saveBtn) saveBtn.addEventListener("click", async () => {
+        const risk = Number(container.querySelector("#plan-risk").value) || null;
+        const entry = Number(container.querySelector("#plan-entry").value) || null;
+        const stop = Number(container.querySelector("#plan-stop").value) || null;
+        const target = Number(container.querySelector("#plan-target").value) || null;
+        const notes = container.querySelector("#plan-notes").value;
+        
+        let qty = null;
+        if (risk && entry && stop) {
+          const res = PaperDelivery.calculatePositionSize(risk, entry, stop, null);
+          if (res.status === "CALCULATED") qty = res.quantity;
+        }
+
+        const candidate = computeCandidate(pendingPlanTicker);
+        const planResult = PaperDelivery.createTransactionPlan(
+          WealthData.getPaperDeliveryTransactions(),
+          WealthData.getPaperDeliveryConfig(),
+          {
+            transactionType: "PLANNED",
+            ticker: pendingPlanTicker,
+            plannedEntryPrice: entry,
+            plannedStopPrice: stop,
+            plannedTargetPrice: target,
+            plannedRiskAmount: risk,
+            quantity: qty,
+            notes: notes
+          },
+          { candidate: candidate }
+        );
+
+        if (!planResult.ok) {
+          App.showStatus(planResult.error, "error");
+          return;
+        }
+        WealthData.addPaperDeliveryTransaction(planResult.transaction);
+        await App.saveNow(false);
+        App.showStatus("Planned trade saved", "ok");
+        pendingPlanTicker = null;
+        refreshPaper();
+      });
+
+      if (cancelBtn) cancelBtn.addEventListener("click", () => {
+        pendingPlanTicker = null;
+        refreshPaper();
+      });
+    }
+
+    container.querySelectorAll("[data-delete-plan]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        if (!confirm("Cancel this planned trade?")) return;
+        WealthData.removePaperDeliveryTransaction(btn.dataset.deletePlan);
+        await App.saveNow(false);
+        App.showStatus("Planned trade cancelled", "ok");
+        refreshPaper();
+      });
+    });
+
+    container.querySelectorAll("[data-convert-plan]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const tId = btn.dataset.convertPlan;
+        const t = transactions.find(x => String(x.id) === String(tId));
+        if (t) {
+           convertingPlanTradeId = t.id;
+           pendingBuyTicker = t.ticker;
+           activePaperSection = "portfolio";
+           refreshPaper();
+        }
+      });
+    });
+  }
+
   function renderPaperTransactions(container) {
     const transactions = PaperDelivery.replay(WealthData.getPaperDeliveryTransactions())
       .transactions.slice().sort((a, b) => {
@@ -1475,5 +1676,5 @@ const DeliveryScreenerModule = (function () {
     ].join("");
   }
 
-  return { render, renderPaperTrading, openPaperBuy, computeCandidate, businessQualityPillar, financialStrengthPillar, valuationPillar, technicalTrendPillar, riskPillar, computeOverall, computeRating };
+  return { render, renderPaperTrading, openPaperBuy, openPaperPlan, computeCandidate, businessQualityPillar, financialStrengthPillar, valuationPillar, technicalTrendPillar, riskPillar, computeOverall, computeRating };
 })();

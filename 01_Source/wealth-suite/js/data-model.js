@@ -196,6 +196,13 @@ const WealthData = (function () {
       state.paperDeliveryTransactions = (Array.isArray(state.paperDeliveryTransactions) ? state.paperDeliveryTransactions : [])
         .filter(transaction => transaction.id !== id);
     },
+    updatePaperDeliveryTransaction(id, updates) {
+      if (!Array.isArray(state.paperDeliveryTransactions)) return false;
+      const index = state.paperDeliveryTransactions.findIndex(tx => tx.id === id);
+      if (index === -1) return false;
+      state.paperDeliveryTransactions[index] = { ...state.paperDeliveryTransactions[index], ...updates };
+      return true;
+    },
     updatePaperDeliveryConfig(updates) {
       const current = state.paperDeliveryConfig && typeof state.paperDeliveryConfig === "object"
         ? state.paperDeliveryConfig : {};
