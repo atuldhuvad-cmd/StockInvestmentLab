@@ -367,6 +367,8 @@ const DeliveryScreenerModule = (function () {
         <select id="ds-sort-select" style="min-height:var(--touch);padding:0 12px;background:var(--bg-raised);border:1px solid var(--rule-bright);color:var(--paper);font-family:var(--mono);">
           ${sortOptions.map(opt => `<option value="${opt.key}">${opt.label}</option>`).join("")}
         </select>
+        <button class="btn" id="ds-export-csv" style="background:transparent;border:1px solid var(--rule-bright);color:var(--paper-dim);">📄 Export CSV</button>
+        <button class="btn" id="ds-export-pdf" style="background:transparent;border:1px solid var(--rule-bright);color:var(--paper-dim);" onclick="window.print()">🖨️ Print / PDF</button>
       </div>
 
       <div id="ds-list"></div>
@@ -500,6 +502,43 @@ const DeliveryScreenerModule = (function () {
       visibleCount = PAGE_SIZE;
       renderFilteredList();
     });
+
+    const exportCsvBtn = container.querySelector("#ds-export-csv");
+    if (exportCsvBtn) {
+      exportCsvBtn.addEventListener("click", () => {
+        let csv = "Ticker,Name,Overall Score,Rating,Assessment,Technical Score,Risk Score\n";
+        allCandidates.forEach(c => {
+          // Use same filtering logic applied to list
+          if (state.filterType === "full" && !c.isFullRating) return;
+          if (state.filterType === "technical" && c.isFullRating) return;
+          if (state.filterType === "missing" && c.assessment !== "Data Missing" && c.assessment !== "Waiting for price history data") return;
+          if (state.filterType === "failed" && c.validationStatus !== "FAILED" && c.validationStatus !== "INVALID") return;
+          
+          if (state.searchText) {
+            const query = state.searchText.toLowerCase();
+            const matchTicker = c.ticker.toLowerCase().includes(query);
+            const matchName = (c.security.name || "").toLowerCase().includes(query);
+            if (!matchTicker && !matchName) return;
+          }
+          
+          const name = '"' + (c.security.name || "").replace(/"/g, '""') + '"';
+          const techScore = (c.pillars.technicalTrend && c.pillars.technicalTrend.score !== null) ? c.pillars.technicalTrend.score : "";
+          const riskScore = (c.pillars.risk && c.pillars.risk.score !== null) ? c.pillars.risk.score : "";
+          const overall = c.overall !== null ? c.overall : "";
+          csv += `${c.ticker},${name},${overall},${c.rating},${c.assessment},${techScore},${riskScore}\n`;
+        });
+        
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `delivery-screener-${new Date().toISOString().slice(0,10)}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      });
+    }
 
     showMoreBtn.addEventListener("click", () => {
       visibleCount += PAGE_SIZE;

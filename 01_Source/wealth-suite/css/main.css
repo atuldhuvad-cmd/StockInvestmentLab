@@ -255,3 +255,61 @@ tbody tr:hover td { background: var(--bg-ticket); color: var(--paper); }
 .sync-status-counts {
   display: flex; gap: 12px; flex-wrap: wrap; margin-top: 4px; font-size: 11px;
 }
+
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+    padding: 0 !important;
+  }
+  .masthead, .nav-tabs, .panel, .paper-action-row, button, select, input, .status-bar, .list-controls, #ds-show-more {
+    display: none !important;
+  }
+  .app-shell {
+    padding: 0;
+    max-width: none;
+  }
+  .ticket {
+    background: white !important;
+    border: 1px solid #ccc !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+    margin-bottom: 20px !important;
+    color: black !important;
+  }
+  .ticket-body {
+    padding: 10px !important;
+  }
+  .ticket-ticker, .ratio-value, .module-header h2, .section-title {
+    color: black !important;
+  }
+  .ratio-label, .module-sub, .ticket-reason, .flag-list {
+    color: #444 !important;
+  }
+  .ratio-grid {
+    background: #ccc !important;
+    border: 1px solid #ccc !important;
+  }
+  .ratio-cell {
+    background: white !important;
+    border: 1px solid #eee !important;
+  }
+  .chip {
+    border-color: #666 !important;
+    color: black !important;
+  }
+  .flag-list li {
+    color: black !important;
+  }
+  .specimen {
+    background: white !important;
+    border: 1px dashed #ccc !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  * {
+    overflow: visible !important;
+    white-space: normal !important;
+  }
+}
+
