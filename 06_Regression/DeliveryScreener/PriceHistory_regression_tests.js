@@ -136,7 +136,7 @@ WealthData.reset();
 WealthData.replaceAll(JSON.parse(backup));
 assertExact("Backup round-trip preserves price-history row count", WealthData.getPriceHistory("TCS").rows.length, 200);
 assertExact("Backup round-trip preserves source symbol", WealthData.getPriceHistory("TCS").sourceSymbol, "TCS.NS");
-assertExact("Price-history write records schema version 4", WealthData.get().meta.schemaVersion, 4);
+assertExact("Price-history write preserves current schema version", WealthData.get().meta.schemaVersion, 5);
 
 WealthData.replaceAll({ holdings:[], meta:{ schemaVersion:3, lastSavedAt:null } });
 assertExact("Legacy backup without priceHistory remains valid", Object.keys(WealthData.get().priceHistory).length, 0);

@@ -84,6 +84,34 @@ const WealthData = (function () {
         // { id, ticker, docType, title, content, aiAnalysis, sourceUrl, addedAt }
       ],
 
+      // Long-term research entities are intentionally separate from the
+      // current membership of any index. A company remains available after
+      // it leaves a research universe; membership history records the change.
+      companies: {
+        // companyId: { companyId, symbol, companyName, isin?, sector?, industry?, active }
+      },
+      researchUniverses: {
+        // universeId: { universeId, name, provider, sourceUrl, active }
+      },
+      indexMembershipHistory: [
+        // { id, universeId, companyId, symbol, status, effectiveDate,
+        //   entryDate?, exitDate?, sourceId, retrievedAt }
+      ],
+      sourceRegistry: [
+        // { sourceId, companyId?, symbol?, sourceType, organization,
+        //   documentTitle, url, publicationDate?, reportingPeriod?,
+        //   retrievedAt, sourceStatus, dataCoverage?, relevantSection?,
+        //   extractionStatus?, validationStatus?, lastChecked?, notes? }
+      ],
+      researchEvidence: [
+        // { evidenceId, companyId?, symbol?, claim, classification,
+        //   sourceId?, calculationLogic?, sourceEvidenceIds?, createdAt }
+      ],
+      quarterlyObservations: [],
+      thesisRegister: [],
+      redFlagRegister: [],
+      evidenceGapRegister: [],
+
       // intradayTrades: the satellite allocation's discipline log — not a
       // signal generator (see intraday-scope-decision.md), a rules-checklist
       // and trade record.
@@ -129,7 +157,7 @@ const WealthData = (function () {
 
       // meta: bookkeeping about the data itself, not the data
       meta: {
-        schemaVersion: 4,
+        schemaVersion: 5,
         lastSavedAt: null
       }
     };
@@ -157,6 +185,16 @@ const WealthData = (function () {
     }),
     getWatchlist: () => state.watchlist,
     getResearchLibrary: () => state.researchLibrary,
+    getCompanies: () => state.companies,
+    getCompany: (companyId) => state.companies[companyId],
+    getResearchUniverses: () => state.researchUniverses,
+    getIndexMembershipHistory: () => state.indexMembershipHistory,
+    getSourceRegistry: () => state.sourceRegistry,
+    getResearchEvidence: () => state.researchEvidence,
+    getQuarterlyObservations: () => state.quarterlyObservations,
+    getThesisRegister: () => state.thesisRegister,
+    getRedFlagRegister: () => state.redFlagRegister,
+    getEvidenceGapRegister: () => state.evidenceGapRegister,
     getSetting: (key) => state.settings[key],
     getAllSettings: () => state.settings,
     getPriceHistory: (ticker) => (state.priceHistory || {})[ticker],
@@ -220,6 +258,42 @@ const WealthData = (function () {
       const id = Date.now() + Math.random();
       state.researchLibrary.push({ id, addedAt: new Date().toISOString(), ...note });
       return id;
+    },
+    upsertCompany(companyId, data) {
+      state.companies[companyId] = { ...state.companies[companyId], ...data, companyId };
+      return companyId;
+    },
+    upsertResearchUniverse(universeId, data) {
+      state.researchUniverses[universeId] = { ...state.researchUniverses[universeId], ...data, universeId };
+      return universeId;
+    },
+    addIndexMembership(record) {
+      state.indexMembershipHistory.push(record);
+      return record.id;
+    },
+    addSourceRecord(record) {
+      state.sourceRegistry.push(record);
+      return record.sourceId;
+    },
+    addResearchEvidence(record) {
+      state.researchEvidence.push(record);
+      return record.evidenceId;
+    },
+    addQuarterlyObservation(record) {
+      state.quarterlyObservations.push(record);
+      return record.id;
+    },
+    addThesisRecord(record) {
+      state.thesisRegister.push(record);
+      return record.thesisId;
+    },
+    addRedFlagRecord(record) {
+      state.redFlagRegister.push(record);
+      return record.id;
+    },
+    addEvidenceGap(record) {
+      state.evidenceGapRegister.push(record);
+      return record.id;
     },
     getIntradayTrades: () => state.intradayTrades,
     addIntradayTrade(trade) {
